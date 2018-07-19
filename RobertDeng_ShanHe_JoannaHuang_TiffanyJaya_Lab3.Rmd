@@ -1,0 +1,14 @@
+---
+title: "W271 Lab 3"
+author: "Tiffany Jaya, Joanna Huang, Shan He, Robert Deng"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+  toc: true
+  number_sections: true
+fontsize: 11pt
+geometry: margin=1in
+header-includes: 
+  - \usepackage{color}
+---
+
