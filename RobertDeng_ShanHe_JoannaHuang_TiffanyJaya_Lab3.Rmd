@@ -11,59 +11,11 @@ output:
 fontsize: 11pt
 ---
 
-# Instructions:
-
-*  $\textbf{Due Date: 7/30/2018 (Monday) Before your live session}$
-*  $\textbf{Page limit (for the first questions) of the pdf report: 10, which does not include the table of content page}$
-  * Do not play around with the margin, linespace, and font size;
-  * Use the one I specify below:
-    * fontsize=11pt
-    * margin=1in
-    * line_spacing=single
-
-* Submission:
-    * Each group only makes to make one submission to ISVC; have one of your team members made the submission
-    * Submit 2 files:
-        1. A pdf file including the summary, the details of your analysis, and all the R codes used to produce the analysis. Please do not suppress the codes in your pdf file.
-        2. R markdown file used to produce the pdf file
-    * Each group only needs to submit one set of files
-    * Use the following file naming convensation; fail to do so will receive 10% reduction in the grade:
-        * FirstNameLastName1_FirstNameLastName2_FirstNameLastName3_LabNumber.fileExtension
-        * For example, if you have three students in the group for Lab X, and their names are Paul Laskowski, Drew Paulin, and Jeffrey Yau, then you should name your file the following
-            * PaulLaskowski_DrewPaulin_JeffreyYau_LabX.Rmd
-            * PaulLaskowski_DrewPaulin_JeffreyYau_LabX.pdf
-    * Although it sounds obvious, please write the name of each members of your group on page 1 of your pdf and Rmd reports.
-    * This lab can be completed in a group of up to 4 people. Each group only needs to make one submission. I strongly encourage students to work in groups for the lab.
-
-* Other general guidelines:
-    * For statistical methods that we cover in this course, use only the R libraries and functions that are covered in this course. If you use libraries and functions that we have not covered but are for the statistical methods we learn in this course, you have to provide (1) explanation of why such libraries and functions are used instead and (2) reference to the library documentation. Lacking the explanation and reference to the documentation will result in a score of zero for the corresponding question.
-
-    * Your report needs to include
-
-        * A thorough analysis of the given dataset, which includ examiniation of anomalies, missing values, potential of top and/or bottom code, etc, in each of the variables.
-        
-        * An introduction section that summarize the question(s) being asked, the methodology employed (including the final model specification), and a highlight of the results.
-        
-        * An Exploratory Data Analysis (EDA) analysis, which includes both graphical and tabular analysis, as taught in this course. Output-dump (that is, graphs and tables that don't come with explanations) will result in a very low, if not zero, score. Since the report has a page-limit, you will have to selectively include the visuals that are most relevant for the analysis and concise explanation of the visuals. Please do not ramble.  Please remember that your report will have to "walk me through" your analysis.
-    
-      * A modeling section that include a detailed narrative. Make sure that your audience (in this case, the professors and your classmates) can easily follow the logic of your analysis that leads to your final model.
-
-          * The rationale ofdecisions made in your modeling, supported by sufficient empirical evidence. Use the insights generated from your EDA step to guide your modeling step, as we discussed in live sessions.
-    
-          * All the steps used to arrive at your final model; these steps must be clearly shown and explained.
-
-      * A conclusion that summarize the final result with respect to the question(s) being asked and key takeaways from the analysis.
-
-
-* Other requirements:
-
-  *  Students are expected to act with regards to UC Berkeley Academic Integrity.
-
 # Question 1: Forecasting using a SARIMA model
 
 *ECOMPCTNSA.csv*, contains quarterly data of E-Commerce Retail Sales as a Percent of Total Sales. The data can be found at: https://fred.stlouisfed.org/series/ECOMPCTNSA.
 
-Build a Seasonal ARIMA model and generate quarterly forecast for 2017. Make sure you use all the steps of building a univariate time series model between lecture 6 and 9, such as checking the raw data, conducting a thorough EDA, justifying all modeling decisions (including transformation), testing model assumptions, and clearly articulating why you chose your given model. Measure and discuss your model's performance. Use both in-sample and out-of-sample model performance. When training your model, exclude the series from 2015 and 2016. For the out-of-sample forecast, measure your model's performance in forecasting the quarterly E-Commerce retail sales in 2015 and 2016. Discuss the model performance. Also forecast beyond the observed time-period of the series. Specifically, generate quarterly forecast for 2017.
+# EDA
 
 ```{r}
 library(car)
@@ -94,62 +46,84 @@ str(e.test)
 ```
 Ecommerce Sales %'s range from 0.7% to 9.5%, skewing right and mostly aggregated in the lower ranges. Mean and variance appear to be stable from the boxplot, but ADF and PP tests can provide more confidence.
 
+```{r}
+tsdisplay(e.train, lag = 70)
+monthplot(e.train)
+monthplot(diff(e.train))
+```
+Looking at the time series plot, the data shows strong seasonalality and non-stationarity given the upward trend so a seasonal differencing will be used. The monthplot shows the seasonality spike every 4th quarter, likely due to holiday sales. It stands out even more apparently in the difference monthplots. Given there is a small increase in the variance with each level, we will also try taking the logarithms to stabilize the variance.
+
+To better determine whether differencing is necessary, we will use the ADF test.
 
 ```{r}
 #Stationarity? I think not, difference between the two tests: #https://stats.stackexchange.com/questions/14076/phillips-perron-unit-root-test-instead-of-adf-test
 adf.test(e.train)
-pp.test(e.train)
+pp.test(e.train) # when I ran this, I got a p-value of 0.01 meaning we should reject the null of non-stationarity
+```
+ADF and PP tests show non-stationarity. 
 
+```{r}
 #ACF PACF - clear deterministic trend (?)
 #Anyway to get the date on x axis working?
 #Differencing still shows seasonality
 #https://www.otexts.org/fpp/8/5
-tsdisplay(e.train, lag = 70)
-tsdisplay(diff(e.train), lag = 70)
-tsdisplay(diff(log(e.train)), lag = 70)
-tsdisplay(diff(diff(e.train)), lag = 70)
-tsdisplay(diff(diff(log(e.train))), lag = 70)
+
+tsdisplay(diff(e.train, lag=4), lag = 70)
+tsdisplay(diff(log(e.train), lag=4), lag = 70)
+tsdisplay(diff(diff(e.train, lag=4)), lag = 70)
+tsdisplay(diff(diff(log(e.train), lag=4)), lag = 70)
 
 ```
+There still appears to be a trend when just taking the seasonal difference of e.train and log of e.train. Thus we took a first difference as well. With the first and seasonally differenced log of e.train, the ACF and PACF look like white noise. This suggests that the data is now stationary.
 
-ADF and PP tests show non-stationarity. The ACF of the regular e.train series shows a decaying sinosoidal curve wiht a significant spike in the PACF at lag 4. We attempt to take the difference and log to stabilize the stationarity, but to of no avail. For now we will stick to the difference series of order 1. Next we need to incorporate seasonality - looking at the monthplot gives us an idea of how the seasonality behaves.
-
-
+# Modeling
+Given our initial analysis, we look at the model behavior of ARIMA models with ranging p and q's, all with first and seasaonl differencing. 
 ```{r}
-monthplot(e.train)
-monthplot(diff(e.train))
-```
-You can see the seasonality spike every 4th quarter, likely due to holiday sales. It stands out even more apparently in the difference monthplots.
-
-```{r}
-# Let's start with some ARIMA models for a basic difference series - apparently p, q = 3 provides the least AIC and BIC, in the negatives?
 for (q in 0:3){
   for(p in 0:3){
-      mod <- Arima(diff(e.train), order = c(p,0,q),
-               seasonal = list(order = c(0,0,0),52),
+      mod <- Arima(log(e.train), order = c(p,1,q),
+               seasonal = list(order = c(p,1,q),4),
                method = "ML")
 
       print(c(p, q, mod$aic, mod$bic))
   }
 }
-
-tm1 <- Arima(diff(e.train), order = c(3,1,3),
-                         seasonal = list(order = c(0,0,0),4),
+```
+The model that returned with the smallest AIC value of-73 and a BIC of -46 was ARIMA(3,1,3)(3,1,3).
+```{r}
+tm1 <- Arima(log(e.train), order = c(3,1,3),
+                         seasonal = list(order = c(3,1,3),4),
                          method = "ML")
 summary(tm1)
 hist(tm1$residuals)
 tsdisplay(tm1$residuals, lag.max = 60)
 
-#Check normal residuals - not normal
+#Check normal residuals
 shapiro.test(tm1$residuals)
 qqnorm(tm1$residuals)
 qqline(tm1$residuals)
 Box.test(tm1$residuals, type = "Ljung-Box")
 ```
+Looking at the residuals of our chosen model, all spoikes are within the significant limits, so our residuals appear to be white noise. Furthermore, the Ljung-Box test shows that residuals have no remaining autocorrelations. The Shapiro-Wilk normality test, histogram and QQ-plot also show that the residuals follow a normal distribution. 
+
+
+# Forecasting 
+We now have a seasonal ARIMA model that passes the required checks and we can move forward with forecasting. We will first see how well our model performs in forecasting the quarterly E-Commerce retail sales in 2015 and 2016.
+```{r}
+plot(forecast(tm1, h=8), col='red')
+par(new=TRUE)
+plot(log(ts(e$ECOMPCTNSA, frequency = 4, start = c(1999), end=c(2016))),col="blue")
+
+```
+Given the closeness of the red (known values) and blue (predicted values) lines, our model appears to perform very well, and we continue to generate the quarterly forecast for 2017.
 
 ```{r}
-#auto arima tells me 0,0,1 and 0,1,0 is better
-tm2 <- auto.arima(diff(e.train))
+plot(forecast(tm1, h=12), col='red')
+```
+
+```{r}
+#auto arima tells me ARIMA(1,1,3) with drift is best but it looks like the residuals are still autocorrelated
+tm2 <- auto.arima(log(e.train))
 summary(tm2)
 hist(tm2$residuals)
 tsdisplay(tm2$residuals, lag.max = 60)
@@ -160,20 +134,6 @@ qqnorm(tm2$residuals)
 qqline(tm2$residuals)
 Box.test(tm2$residuals, type = "Ljung-Box")
 ```
-
-```{r}
-#predict template
-tm2.pred <- predict(tm2, n.ahead = 8)
-e.pred <- ts(tm2.pred$pred, st = 2015, fr = 4)
-
-#stuck trying to undifference the series
-undiff.e.pred <- cumsum(c(e.train[length(e.train)], e.pred))
-
-ts.plot(c(e.train, undiff.e.pred),lty=1:2)
-ts.plot(c(e.train, e.test),lty=1:2)
-
-```
-
 # Question 2: Learning how to use the xts library
 
 ## Materials covered in Question 2 of this lab
