@@ -11,6 +11,71 @@ output:
 fontsize: 11pt
 ---
 
+```{r}
+# add packages
+library(ggplot2)
+# prevent source code from running off the page
+opts_chunk$set(tidy.opts=list(width.cutoff=70), tidy=TRUE)
+# remove all objects from current workspace
+rm(list = ls())
+# set seed number to reproduce results
+set.seed(1)
+# load data
+# 1. ECOMPCTNSA: E-commerce retail sales as a percent of total sales
+sales <- read.csv('./data/ECOMPCTNSA.csv', header=TRUE, sep=',')
+# 2. AMAZ.csv: Amazon
+amazon <- read.csv('./data/AMAZ.csv', header=TRUE, sep=',')
+# 3. UMCSENT.csv: ???
+sentiment <- read.csv('./data/UMCSENT.csv', header=TRUE, sep=',')
+# 4. bls_unemployment.csv
+unemp <- read.csv('./data/bls_unemployment.csv', header=TRUE, sep=',')
+```
+
+```{r}
+sales
+```
+```{r}
+amazon
+```
+
+```{r}
+umcsent
+```
+
+
+
+# Introduction
+
+* summarize the question being asked
+* result
+
+Data: E-Commerce retail sales as a percent of total sales
+
+# EDA
+
+* anomalies
+* missing values
+* potential top/bottom code
+
+# Modeling
+
+* rational of decision for selecting the model
+
+# Conclusion
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # Question 1: Forecasting using a SARIMA model
 
 *ECOMPCTNSA.csv*, contains quarterly data of E-Commerce Retail Sales as a Percent of Total Sales. The data can be found at: https://fred.stlouisfed.org/series/ECOMPCTNSA.
