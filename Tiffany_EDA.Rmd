@@ -4,3 +4,153 @@ author: "Tiffany Jaya"
 date: "7/24/2018"
 output: html_document
 ---
+
+```{r}
+# add packages
+library(car)
+library(dplyr)
+library(astsa)
+library(Hmisc)
+library(forecast)
+library(ggplot2)
+library(fpp)
+library(xts)
+library(MASS)
+# prevent source code from running off the page
+opts_chunk$set(tidy.opts=list(width.cutoff=70), tidy=TRUE)
+# remove all objects from current workspace
+rm(list = ls())
+# set seed number to reproduce results
+set.seed(1)
+# load data
+# 1. ECOMPCTNSA: E-commerce retail sales as a percent of total sales
+# https://fred.stlouisfed.org/series/ECOMPCTNSA
+sales <- read.csv('./data/ECOMPCTNSA.csv', header=TRUE, sep=',')
+# 2. AMAZ.csv: Amazon stock sales
+amazon <- read.csv('./data/AMAZ.csv', header=TRUE, sep=',')
+# 3. UMCSENT.csv: University of Michigan Consumer Sentiment Index
+# https://fred.stlouisfed.org/series/UMCSENT/ 
+sentiment <- read.csv('./data/UMCSENT.csv', header=TRUE, sep=',')
+# 4. bls_unemployment.csv: Bureau of Labor Statistic unemployment rate
+# https://data.bls.gov/timeseries/LNS14000000 
+unemp <- read.csv('./data/bls_unemployment.csv', header=TRUE, sep=',')
+```
+
+
+# Introduction
+
+* summarize the question being asked
+* result 
+
+Data: E-Commerce retail sales as a percent of total sales
+
+# EDA
+
+* anomalies
+* missing values
+* potential top/bottom code
+
+## Univariate Analysis
+
+### ECOMPCTNSA
+
+*ECOMPCTNSA.csv*, contains quarterly data of E-Commerce Retail Sales as a Percent of Total Sales. The data can be found at: https://fred.stlouisfed.org/series/ECOMPCTNSA.
+
+
+```{r}
+sales
+```
+
+--------------------------------------------------------------------------------
+
+Source: U.S. Bureau of the Census   Release: Quarterly Retail E-Commerce Sales  
+Units:  Percent, Not Seasonally Adjusted
+
+E-commerce retail sales as a percent of total sales
+
+Frequency:  Quarterly
+
+E-commerce sales are sales of goods and services where the buyer places an order, or the price and terms of the sale are negotiated over an Internet, mobile device (M-commerce), extranet, Electronic Data Interchange (EDI) network, electronic mail, or other comparable online system. Payment may or may not be made online.
+
+--------------------------------------------------------------------------------
+
+Build a Seasonal ARIMA model and generate quarterly forecast for 2017. Make sure you use all the steps of building a univariate time series model between lecture 6 and 9, such as checking the raw data, conducting a thorough EDA, justifying all modeling decisions (including transformation), testing model assumptions, and clearly articulating why you chose your given model. Measure and discuss your model’s performance. Use both in-sample and out-of-sample model performance. When training your model, exclude the series from 2015 and 2016. For the out-of-sample forecast, measure your model’s performance in forecasting the quarterly E-Commerce retail sales in 2015 and 2016. Discuss the model performance. Also forecast beyond the observed time-period of the series. Specifically, generate quarterly forecast for 2017.
+
+--------------------------------------------------------------------------------
+
+1. Seasonal ARIMA model, quarterly forecast for 2017
+
+```{r}
+ts.sales <- ts(sales$ECOMPCTNSA, start=c(1999,4), frequency=4)
+# exclude series from 2015 and 2016
+ts.sales.train <- ts(ts.sales[time(ts.sales) < 2015], start=c(1999,4), frequency=4)
+ts.sales.train <- ts(ts.sales[time(ts.sales) < 2015], start=c(1999,4), frequency=4)
+```
+
+
+2. Build a univariate time series model lecture 6 and lecture 9
+2.a. check raw data
+
+2.b. conduct thorough EDA
+
+2.c. justify modeling decisions, including transformations
+
+2.d. testing model assumptions
+
+2.e. articulting why you chose your given model
+
+3. Measure and discuss model's performance (in-sample and out-of-sample model performance), exclude series 2015-2016
+
+3.a. in-sample, exclude-series 2015-2016
+
+3.b. out-of-sample, in 2015 and 2016
+
+4. Generate quarterly forecast for 2017
+
+
+### AMAZ
+
+```{r}
+amazon
+```
+
+### UMCSENT
+
+```{r}
+sentiment
+```
+
+Units:  Index 1966:Q1=100, Not Seasonally Adjusted
+
+Frequency:  Monthly
+
+At the request of the source, the data is delayed by 1 month. To obtain historical data prior to January 1978, please see FRED data series UMCSENT1.
+
+This data should be cited as follows: "Surveys of Consumers, University of Michigan, University of Michigan: Consumer Sentiment© [UMCSENT], retrieved from FRED, Federal Reserve Bank of St. Louis https://fred.stlouisfed.org/series/UMCSENT/, (Accessed on date)"
+
+### bls_unemployment
+
+```{r}
+unemp
+```
+
+
+
+Series Id:           LNS14000000
+Seasonally Adjusted
+Series title:        (Seas) Unemployment Rate
+Labor force status:  Unemployment rate
+Type of data:        Percent or rate
+Age:                 16 years and over
+
+# Modeling 
+
+* rational of decision for selecting the model
+
+# Conclusion
+
+
+
+
+
+
