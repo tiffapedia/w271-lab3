@@ -1,14 +1,12 @@
 ---
-title: 'Statistical Methods for Discrete Response, Time Series, and Panel Data (W271):
-  Lab 3'
-author: "Professor Jeffrey Yau"
-geometry: margin=1in
-output:
-  html_document: default
-  number_sections: yes
-  pdf_document: null
-  toc: yes
+title: "W271 Lab 3"
+author: "Tiffany Jaya, Joanna Huang, Shan He, Robert Deng"
+output: 
+  pdf_document:
+  toc: true
+  number_sections: true
 fontsize: 11pt
+geometry: margin=1in
 ---
 
 # Question 1: Forecasting using a SARIMA model
@@ -29,7 +27,7 @@ library(xts)
 library(MASS)
 
 #Read in data
-e <- read.csv("/Users/heshan/Desktop/Berkeley/labs/w271-lab3/data/ECOMPCTNSA.csv")
+e <- read.csv("./data/ECOMPCTNSA.csv")
 ts.e <- ts(e$ECOMPCTNSA, frequency = 4, start = c(1999, 4))
 
 #EDA
@@ -43,8 +41,17 @@ e.train <- ts.e[time(ts.e) < 2015]
 e.test <- ts.e[time(ts.e) > 2014]
 str(e.train)
 str(e.test)
+
+# check for missing values
+sum(is.na(e))
 ```
 Ecommerce Sales %'s range from 0.7% to 9.5%, skewing right and mostly aggregated in the lower ranges. Mean and variance appear to be stable from the boxplot, but ADF and PP tests can provide more confidence.
+
+```{r}
+plot(e.train, xlab='Date', ylab='E-Commerce Retail Sales', main='E-Commerce Sales: % of Total From 1996-2014')
+lines(ma(e.train, order=4, centre=T), col='blue')
+```
+
 
 ```{r}
 tsdisplay(e.train, lag = 70)
@@ -157,6 +164,12 @@ period.apply(x, INDEX, FUN, ...)
 As an example, we use the Twitter stock price series (to be precise, the daily closing price), create an index storing the points corresopnding to the weeks of the daily series, and apply functions to calculate the weekly mean. 
 
 ```{r}
+library(quantmod)
+getSymbols('TWTR')
+```
+
+
+```{r}
 # Step 1: Identify the endpoints; in this case, we use weekly time interval. That is, we extract the end index on each week of the series
 
 #View(TWTR)
@@ -195,8 +208,8 @@ head(cbind(TWTR[,4], rollapply(TWTR[, 4], 10, FUN = mean, na.rm = TRUE)),15)
 1. Read AMAZ.csv and UMCSENT.csv into R as R DataFrames
 
 ```{r}
-a <- read.csv("AMAZ.csv")
-u <- read.csv("UMCSENT.csv")
+a <- read.csv("./data/AMAZ.csv")
+u <- read.csv("./data/UMCSENT.csv")
 #describe(a)
 #describe(u)
 ```
