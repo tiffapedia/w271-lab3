@@ -25,6 +25,9 @@ library(ggplot2)
 library(fpp)
 library(xts)
 library(MASS)
+```
+
+```{r fig.show='hold', fig.align='center', out.width='49%'}
 
 #Read in data
 e <- read.csv("./data/ECOMPCTNSA.csv")
@@ -47,13 +50,13 @@ sum(is.na(e))
 ```
 Ecommerce Sales %'s range from 0.7% to 9.5%, skewing right and mostly aggregated in the lower ranges. Mean and variance appear to be stable from the boxplot, but ADF and PP tests can provide more confidence.
 
-```{r}
+```{r fig.show='hold', fig.align='center', out.width='49%'}
 plot(e.train, xlab='Date', ylab='E-Commerce Retail Sales', main='E-Commerce Sales: % of Total From 1996-2014')
 lines(ma(e.train, order=4, centre=T), col='blue')
 ```
 
 
-```{r}
+```{r fig.show='hold', fig.align='center', out.width='49%'}
 tsdisplay(e.train, lag = 70)
 monthplot(e.train)
 monthplot(diff(e.train))
@@ -70,7 +73,7 @@ pp.test(e.train) # when I ran this, I got a p-value of 0.01 meaning we should re
 ```
 ADF and PP tests show non-stationarity. 
 
-```{r}
+```{r fig.show='hold', fig.align='center', out.width='49%'}
 #ACF PACF - clear deterministic trend (?)
 #Anyway to get the date on x axis working?
 #Differencing still shows seasonality
@@ -117,7 +120,7 @@ Looking at the residuals of our chosen model, all spoikes are within the signifi
 
 # Forecasting 
 We now have a seasonal ARIMA model that passes the required checks and we can move forward with forecasting. We will first see how well our model performs in forecasting the quarterly E-Commerce retail sales in 2015 and 2016.
-```{r}
+```{r fig.show='hold', fig.align='center', out.width='49%'}
 plot(forecast(tm1, h=8), col='red')
 par(new=TRUE)
 plot(log(ts(e$ECOMPCTNSA, frequency = 4, start = c(1999), end=c(2016))),col="blue")
@@ -125,11 +128,11 @@ plot(log(ts(e$ECOMPCTNSA, frequency = 4, start = c(1999), end=c(2016))),col="blu
 ```
 Given the closeness of the red (known values) and blue (predicted values) lines, our model appears to perform very well, and we continue to generate the quarterly forecast for 2017.
 
-```{r}
+```{r fig.show='hold', fig.align='center', out.width='49%'}
 plot(forecast(tm1, h=12), col='red')
 ```
 
-```{r}
+```{r fig.show='hold', fig.align='center', out.width='49%'}
 #auto arima tells me ARIMA(1,1,3) with drift is best but it looks like the residuals are still autocorrelated
 tm2 <- auto.arima(log(e.train))
 summary(tm2)
@@ -161,7 +164,7 @@ The family of ```apply``` functions perhaps is one of the most powerful R functi
 period.apply(x, INDEX, FUN, ...)
 ```
 
-As an example, we use the Twitter stock price series (to be precise, the daily closing price), create an index storing the points corresopnding to the weeks of the daily series, and apply functions to calculate the weekly mean. 
+As an example, we use the Twitter stock price series (to be precise, the daily closing price), create an index storing the points corresponding to the weeks of the daily series, and apply functions to calculate the weekly mean. 
 
 ```{r}
 library(quantmod)
@@ -262,7 +265,7 @@ UMCSENT02['2007-01-03']
 
 4. Calculate the daily return of the Amazon closing price (AMAZ.close), where daily return is defined as $(x(t)-x(t-1))/x(t-1)$. Plot the daily return series.
 
-```{r}
+```{r fig.show='hold', fig.align='center', out.width='49%'}
 daily_return <- (ats[,4] - lag(ats[,4], k = 1))/ (lag(ats[,4], k = 1))
 
 plot(daily_return)
