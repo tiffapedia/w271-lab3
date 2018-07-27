@@ -25,6 +25,9 @@ library(ggplot2)
 library(fpp)
 library(xts)
 library(MASS)
+```
+
+```{r fig.show='hold', fig.align='center', out.width='49%'}
 
 #Read in data
 e <- read.csv("./data/ECOMPCTNSA.csv")
@@ -37,42 +40,40 @@ ggplot(e, aes(e$ECOMPCTNSA)) + geom_histogram(bins = 9) + ggtitle("Ecommerce Sal
 boxplot(ts.e~cycle(ts.e))
 
 #train/test
-e.train <- ts.e[time(ts.e) < 2015]
-e.test <- ts.e[time(ts.e) > 2014]
+e.train <- ts(ts.e[time(ts.e) < 2015], frequency = 4)
+e.test <- ts(ts.e[time(ts.e) > 2014], frequency = 4)
 str(e.train)
 str(e.test)
 
 # check for missing values
 sum(is.na(e))
 ```
-Ecommerce Sales %'s range from 0.7% to 9.5%, skewing right and mostly aggregated in the lower ranges. Mean and variance appear to be stable from the boxplot, but ADF and PP tests can provide more confidence.
+Ecommerce Sales %'s range from 0.7% to 9.5%, skewing right and mostly aggregated in the lower ranges with 0 NAs. Mean and variance appear to be stationary from the boxplot, but ADF tests can provide more confidence.
 
-```{r}
+```{r fig.show='hold', fig.align='center', out.width='49%'}
 plot(e.train, xlab='Date', ylab='E-Commerce Retail Sales', main='E-Commerce Sales: % of Total From 1996-2014')
 lines(ma(e.train, order=4, centre=T), col='blue')
 ```
 
 
-```{r}
+```{r fig.show='hold', fig.align='center', out.width='49%'}
 tsdisplay(e.train, lag = 70)
 monthplot(e.train)
 monthplot(diff(e.train))
 ```
 
-Looking at the time series plot, the data shows strong seasonalality and non-stationarity given the upward trend, with increasing variance, both a seasonal differencing and first-order difference may be needed The monthplot shows the seasonality spike every 4th quarter, likely due to holiday sales. It stands out even more apparently in the difference monthplots. Given there is a small increase in the variance with each level, we will also try taking the logarithms to stabilize the variance.
+Looking at the time series plot, the data shows strong seasonalality every 4th quarter, and non-stationarity given the upward trend, with increasing variance. Both a seasonal differencing and first-order difference may be needed. The ACF shows a slowly decaying significant positive and negative values that signal a need for higher order differencing. PACF only has 1 significant spike at lag 4 which may suggest an AR order.
 
-To better determine whether differencing is necessary, we will use the ADF test.
+The monthplot shows no seasonality, but it comes out in the difference monthplots. Given there is a small increase in the variance with each level from the tsplot, we will also try taking the logarithms to stabilize the variance. To better determine whether differencing is necessary, we will use the ADF test instead of the PP test due to the small sample size of 61.
 
 ```{r}
-#Stationarity? I think not, difference between the two tests: #https://stats.stackexchange.com/questions/14076/phillips-perron-unit-root-test-instead-of-adf-test
+#Not Stationarity, difference between ADF and PP test:
+#https://stats.stackexchange.com/questions/14076/phillips-perron-unit-root-test-instead-of-adf-test
 adf.test(e.train)
-pp.test(e.train) # when I ran this, I got a p-value of 0.01 meaning we should reject the null of non-stationarity
 ```
-ADF and PP tests show non-stationarity. 
+ADF test confirms non-stationarity. Now we test out a few transformations (log and difference) to identify the best one to stabilize the stationarity.
 
-```{r}
-#ACF PACF - clear deterministic trend (?)
-#Anyway to get the date on x axis working?
+```{r fig.show='hold', fig.align='center', out.width='49%'}
 #Differencing still shows seasonality
 #https://www.otexts.org/fpp/8/5
 
@@ -80,28 +81,33 @@ tsdisplay(diff(e.train, lag=4), lag = 70)
 tsdisplay(diff(log(e.train), lag=4), lag = 70)
 tsdisplay(diff(diff(e.train, lag=4)), lag = 70)
 tsdisplay(diff(diff(log(e.train), lag=4)), lag = 70)
-
 ```
 There still appears to be a trend when just taking the seasonal difference of e.train and log of e.train. Thus we took a first difference as well. With the first and seasonally differenced log of e.train, the ACF and PACF look better but we still see a significant PACF at lag 4. This may suggest a seasonal first order AR is needed for our model. 
 
 # Modeling
-Given our initial analysis, we look at the model behavior of ARIMA models with ranging p and q's, all with first and seasaonl differencing. 
+Given our initial analysis, we look at the model behavior of ARIMA models with these specifications and assumptions as a starting point to pivot from:
+  -Varying AR, MA parameters p and q's ranging from 0-3 
+  -Log of training data
+  -1st seasonal order differencing
+  -Seasonal lags 1 for AR and MA for the spikes in the ACF and PACF above (lag 4 reduced by requency 4 = 1)
 ```{r}
 for (q in 0:3){
   for(p in 0:3){
       mod <- Arima(log(e.train), order = c(p,1,q),
-               seasonal = list(order = c(p,1,q),4),
+               seasonal = list(order = c(1,1,1),4),
                method = "ML")
-
       print(c(p, q, mod$aic, mod$bic))
   }
 }
 
 ```
-The model that returned with the smallest AIC value of-73 and a BIC of -46 was ARIMA(3,1,3)(3,1,3).
+The model that returned with the smallest AIC value of-205.5 and a BIC of -199.42 was ARIMA(0,1,0)(1,1,1), written as:
+(https://www.otexts.org/fpp/8/9)
+$(1+0.548\Phi_1B^4)(1-B)(1-B^4)y_t=(1+0.2046\Theta_1B^4)e_t$
+
 ```{r}
-tm1 <- Arima(log(e.train), order = c(3,1,3),
-                         seasonal = list(order = c(3,1,3),4),
+tm1 <- Arima(log(e.train), order = c(0,1,0),
+                         seasonal = list(order = c(1,1,1),4),
                          method = "ML")
 summary(tm1)
 hist(tm1$residuals)
@@ -113,23 +119,26 @@ qqnorm(tm1$residuals)
 qqline(tm1$residuals)
 Box.test(tm1$residuals, type = "Ljung-Box")
 ```
-Looking at the residuals of our chosen model, all spoikes are within the significant limits, so our residuals appear to be white noise. Furthermore, the Ljung-Box test shows that residuals have no remaining autocorrelations. The Shapiro-Wilk normality test, histogram and QQ-plot also show that the residuals follow a normal distribution. 
+
+Looking at the residuals of our chosen model, all spoikes are within the significant limits, so our residuals appear to be white noise. Furthermore, the Ljung-Box test shows that residuals are independent (null hypothesis = independence). The Shapiro-Wilk normality test, histogram and QQ-plot also show that the residuals follow a normal distribution. 
 
 # Forecasting 
 We now have a seasonal ARIMA model that passes the required checks and we can move forward with forecasting. We will first see how well our model performs in forecasting the quarterly E-Commerce retail sales in 2015 and 2016.
-```{r}
-plot(forecast(tm1, h=8), col='red')
-par(new=TRUE)
-plot(log(ts(e$ECOMPCTNSA, frequency = 4, start = c(1999), end=c(2016))),col="blue")
 
+```{r fig.show='hold', fig.align='center', out.width='49%'}
+preds = predict(tm1, n.ahead = 8)$pred
+ts.plot(e.train,exp(preds), lty = c(1, 3), col = (2))
+par(new=TRUE)
+ts.plot(ts.e, col="blue", xy.lines = NA)
 ```
+
 Given the closeness of the red (known values) and blue (predicted values) lines, our model appears to perform very well, and we continue to generate the quarterly forecast for 2017.
 
-```{r}
+```{r fig.show='hold', fig.align='center', out.width='49%'}
 plot(forecast(tm1, h=12), col='red')
 ```
 
-```{r}
+```{r fig.show='hold', fig.align='center', out.width='49%'}
 #auto arima tells me ARIMA(1,1,3) with drift is best but it looks like the residuals are still autocorrelated
 tm2 <- auto.arima(log(e.train))
 summary(tm2)
@@ -161,7 +170,7 @@ The family of ```apply``` functions perhaps is one of the most powerful R functi
 period.apply(x, INDEX, FUN, ...)
 ```
 
-As an example, we use the Twitter stock price series (to be precise, the daily closing price), create an index storing the points corresopnding to the weeks of the daily series, and apply functions to calculate the weekly mean. 
+As an example, we use the Twitter stock price series (to be precise, the daily closing price), create an index storing the points corresponding to the weeks of the daily series, and apply functions to calculate the weekly mean. 
 
 ```{r}
 library(quantmod)
@@ -262,7 +271,7 @@ UMCSENT02['2007-01-03']
 
 4. Calculate the daily return of the Amazon closing price (AMAZ.close), where daily return is defined as $(x(t)-x(t-1))/x(t-1)$. Plot the daily return series.
 
-```{r}
+```{r fig.show='hold', fig.align='center', out.width='49%'}
 daily_return <- (ats[,4] - lag(ats[,4], k = 1))/ (lag(ats[,4], k = 1))
 
 plot(daily_return)
