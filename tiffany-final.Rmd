@@ -1,0 +1,28 @@
+---
+title: "W271 Lab 3"
+author: "Tiffany Jaya, Joanna Huang, Shan He, Robert Deng"
+output: 
+  pdf_document:
+  toc: true
+  number_sections: true
+fontsize: 11pt
+geometry: margin=1in
+---
+
+```{r}
+# add packages
+library(knitr)
+library(ggplot2)
+# prevent source code from running off the page
+opts_chunk$set(tidy.opts=list(width.cutoff=70), tidy=TRUE)
+# remove all objects from current workspace
+rm(list = ls())
+# set seed number to reproduce results
+set.seed(1)
+# load data
+# 1. ECOMPCTNSA: E-commerce retail sales as a percent of total sales
+# https://fred.stlouisfed.org/series/ECOMPCTNSA
+raw.sales <- read.csv('./data/ECOMPCTNSA.csv', header=TRUE, sep=',')
+```
+
+# Introduction

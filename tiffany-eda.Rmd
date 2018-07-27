@@ -94,7 +94,7 @@ sales.quarter.test <- ts(sales.quarter[time(sales.quarter) >= 2015]) # 2015-2016
 
 ```{r}
 # check for missing values
-sum(is.na(ts.sales))
+sum(is.na(sales.quarter))
 ```
 
 2.b. conduct thorough EDA
@@ -129,6 +129,83 @@ If the random variation is modelled by a multiplicative factor and the variable 
 sales.decom <- decompose(sales.quarter, type='mult')
 ts.plot(cbind(sales.decom$trend, sales.decom$trend * sales.decom$seasonal), lty = 1:2)
 ```
+
+The variance can be seen to increase as t increases, whilst after the logarithm is taken the variance is approximately constant from 2010 and later (over the period of the record).
+
+```{r}
+plot(sales.quarter)
+plot(log(sales.quarter))
+```
+
+Therefore, as the number of people using the airline can also only be positive, the logarithm would be appropriate in the model formulation for this time series. In the following code, a harmonic model with polynomial trend is fitted to the air passenger series. The function time is used to extract the time and create a standardised time variable TIME.
+
+```{r}
+SIN <- COS <- matrix(nr = length(sales.quarter), nc = 6)
+for (i in 1:6) {
+    SIN[, i] <- sin(2 * pi * i * time(sales.quarter))
+    COS[, i] <- cos(2 * pi * i * time(sales.quarter))
+}
+TIME <- (time(sales.quarter) - mean(time(sales.quarter)))/sd(time(sales.quarter))
+(mean(time(sales.quarter)))
+(sd(time(sales.quarter)))
+```
+
+```{r}
+sales.lm1 <- lm(log(sales.quarter) ~ TIME + I(TIME^2) + I(TIME^3) + I(TIME^4) +
+         SIN[,1] + COS[,1] + SIN[,2] + COS[,2] + SIN[,3] + COS[,3] +
+         SIN[,4] + COS[,4] + SIN[,5] + COS[,5] + SIN[,6] + COS[,6])
+coef(sales.lm1)/sqrt(diag(vcov(sales.lm1)))
+```
+
+```{r}
+sales.lm2 <- lm(log(sales.quarter) ~ TIME + I(TIME^2) + SIN[,1] + COS[,1] +
+    SIN[,2] + COS[,2] + SIN[,3] + SIN[,4] + COS[,4] + SIN[,5])
+coef(sales.lm2)/sqrt(diag(vcov(sales.lm2)))
+```
+
+
+```{r}
+AIC(sales.lm1)
+AIC(sales.lm2)
+```
+
+```{r}
+# correlogram of the residual series
+acf(resid(sales.lm2))
+```
+
+```{r}
+# partial autocorrelations of the residual series
+pacf(resid(sales.lm2))
+```
+The residual correlogram indicates that the data are positively autocorrelated.
+
+the standard errors of the parameter estimates are likely to be under-estimated if there is positive serial corre- lation in the data. This implies that predictor variables may falsely appear ‘significant’ in the fitted model. In the code below, GLS is used to check the significance of the variables in the fitted model, using the lag 1 autocorrelation (approximately 0.65)
+
+```{r}
+library(nlme)
+sales.gls <- gls(log(sales.quarter) ~ TIME + I(TIME^2) + SIN[,1] + COS[,1] +
+     SIN[,2] + COS[,2] + SIN[,3] + SIN[,4] + COS[,4] + SIN[,5],
+     correlation = corAR1(0.6))
+coef(sales.gls)/sqrt(diag(vcov(sales.gls)))
+```
+
+
+
+the partial autocorrelation plot suggests that the resid- ual series follows an AR(1) process, which is fitted to the series below:
+
+```{r}
+sales.ar <- ar(resid(sales.lm2), order=1, method='mle')
+sales.ar$ar
+```
+
+```{r}
+acf(sales.ar$res[-1])
+```
+the lag of this significant value corresponds to the seasonal lag (12) in the original series, which implies that the fitted model has failed to fully account for the seasonal variation in the data.
+
+Understandably, the reader might regard this as curious, given that the data were fitted using the full seasonal harmonic model. However, seasonal effects can be stochastic just as trends can, and the harmonic model we have used is deterministic. In Chapter 7, models with stochastic seasonal terms will be considered.
+
 ```{r}
 plot(sales.decom)
 ```
@@ -138,13 +215,134 @@ the multiplicative model would seem more appropriate than the additive model bec
 
 The random component, which correponds to z_t, does not have increasing variance therefore a log transformation is not appropriate for this series. Look at chapter 5 for decomposing time series
 
+ACF shows a significant autocorrelation at lag 4 might indicate that seasonal adjustment is not adequate
 ```{r}
-# print out lag 1 autocorrelation for sales.quarter.train 
+# lag 1 autocorrelation 
 acf(sales.quarter.train)$acf[2]
 ```
 
+lag 1 autocorrelation of 0.8848579 implies that a linear dependency of x_t on x_t-1 would only explain 88.49% of the variability of x_t.  The gradual decay is typical of a time series containing a trend. The peak at the 4th month indicates seasonal variation.
+
+```{r}
+# lag 1 autocovariance
+acf(sales.quarter.train, type=c('covariance'))$acf[2]
+```
+
+regression: assumes linear trend
+decompose: does not assume any particular trend
+
+```{r}
+# reduction in sd shows that seasonal adjustment has been very effective
+(sd(sales.quarter))
+(sd(sales.quarter - decompose(sales.quarter)$trend))
+(sd(decompose(sales.quarter)$random))
+```
+
+
+```{r}
+# first-order difference of a random walk are white noise series
+acf(diff(sales.quarter))
+```
+There is not a good evidence that the series follows a random walk since there are obvious patterns in the correlogram, with multiple margianlly statistically significant values.
+
+A significant value occurs at lag 1, suggesting that a more complex model may b needed 
+
+```{r}
+sales.quarter.hw <- HoltWinters(sales.quarter, alpha=1, gamma=0)
+acf(resid(sales.quarter.hw))
+```
+
+The residual is not white noise.
 
 2.c. justify modeling decisions, including transformations
+
+As we have discovered in the previous chapters, many time series are non- stationary because of seasonal effects or trends. In particular, random walks, which characterise many types of series, are non-stationary but can be trans- formed to a stationary series by first-order differencing 
+
+In this chap- ter we first extend the random walk model to include autoregressive and moving average terms. As the differenced series needs to be aggregated (or ‘integrated’) to recover the original series, the underlying stochastic process is called autoregressive integrated moving average, which is abbreviated to ARIMA.
+
+non-stationary seasonal ARIMA (SARIMA) process
+
+Series may also be non-stationary because the variance is serially corre- lated (technically known as conditionally heteroskedastic), which usually re- sults in periods of volatility, where there is a clear change in variance. One approach to modelling series of this nature is to use an autoregressive model for the variance, i.e. an autoregressive conditional het- eroskedastic (ARCH) model.
+
+Differencing a series {xt} can remove trends, whether these trends are stochas- tic, as in a random walk, or deterministic, as in the case of a linear trend.
+Notice that the consequence of differencing a linear trend with white noise is an MA(1) process, whereas subtraction of the trend, a + bt, would give white noise. This raises an issue of whether or not it is sen- sible to use differencing to remove a deterministic trend. The arima function in R does not allow the fitted differenced models to include a constant. If you wish to fit a differenced model to a deterministic trend using R you need to difference, then mean adjust the differenced series to have a mean of 0, and then fit an ARMA model to the adjusted differenced series using arima with include.mean set to FALSE and d = 0.
+
+```{r}
+plot(sales.quarter)
+plot(diff(sales.quarter)) 
+plot(diff(log(sales.quarter)))
+```
+
+The increasing trend is no longer apparent in the plots of the differenced series
+
+Plot of Australian electricity production series; (b) plot of the first- order differenced series; (c) plot of the first-order differenced log-transformed series.
+
+Seasonal ARIMA models can potentially have a large number of parameters and combinations of terms. Therefore, it is appropriate to try out a wide range of models when fitting to data and to choose a best-fitting model using an appropriate criterion such as the AIC. Once a best-fitting model has been found, the correlogram of the residuals should be verified as white noise. Some confidence in the best-fitting model can be gained by deliberately overfitting the model by including further parameters and observing an increase in the AIC.
+
+The parameter d = 1 is re- tained in both the models since we found in §7.2.1 that first-order differencing successfully removed the trend in the series.
+
+```{r}
+# autoregressive term 
+AIC (arima(log(sales.quarter), order = c(1,1,0),
+                             seas = list(order = c(1,0,0), 12)))
+# moving average term
+AIC (arima(log(sales.quarter), order = c(0,1,1),
+                             seas = list(order = c(0,0,1), 12)))
+```
+
+A simple AR model with a seasonal period of 12 units, denoted as ARIMA(0, 0, 0)(1, 0, 0)12, is xt = αxt−12 + wt. Such a model would be appropriate for monthly data when only the value in the month of the previous year influences the current monthly value. The model is station- ary when |α−1/12| > 1.
+
+
+```{r}
+ get.best.arima <- function(x.ts, maxord = c(1,1,1,1,1,1))
+ {
+   best.aic <- 1e8
+   n <- length(x.ts)
+   for (p in 0:maxord[1]) for(d in 0:maxord[2]) for(q in 0:maxord[3])
+     for (P in 0:maxord[4]) for(D in 0:maxord[5]) for(Q in 0:maxord[6])
+     {
+        fit <- arima(x.ts, order = c(p,d,q),
+                           seas = list(order = c(P,D,Q),
+                           frequency(x.ts)), method = "CSS")
+        fit.aic <- -2 * fit$loglik + (log(n) + 1) * length(fit$coef)
+        if (fit.aic < best.aic)
+        {
+best.aic <- fit.aic
+          best.fit <- fit
+          best.model <- c(p,d,q,P,D,Q)
+} }
+   list(best.aic, best.fit, best.model)
+ }
+
+best.arima.elec <- get.best.arima( log(sales.quarter),
+                                       maxord = c(2,2,2,2,2,2))
+
+best.fit.elec <- best.arima.elec[[2]]
+acf( resid(best.fit.elec) )
+best.arima.elec [[3]]
+
+ts.plot( cbind( window(sales.quarter,start = 2015),
+                   exp(predict(best.fit.elec,4)$pred) ), lty = 1:2)
+
+```
+
+
+
+```{r}
+plot(sales.quarter)
+plot(diff(sales.quarter, lag=4)) # remove both linear trend and additive seasonal effects in a quarterly series
+plot(diff(log(sales.quarter), lag=4))
+```
+
+First-order differencing successfully removed the trend in the series.
+
+```{r}
+
+# autoregressive terms
+
+# moving average terms
+```
+
 
 2.d. testing model assumptions
 
@@ -158,6 +356,46 @@ acf(sales.quarter.train)$acf[2]
 
 4. Generate quarterly forecast for 2017
 
+
+Approaches to model time series:
+1. fixed seasonal pattern about a trend (ese unit 8: https://github.com/tiffapedia/w271-notes/blob/master/unit8/LiveSession08_students.Rmd)
+   * estimate the trend by local averaging of the deseasonalised data using decompose
+2. allows seasonal variation and trend, described in terms of a level and slope, to change over time and estimates these fefatures by exponentially weighted averages
+   * HoltWinters
+3. if residual error series appears to be a realisation of independent random variables 
+   * build models up from a model of independent random variation, known as discrete white noise
+   
+The seasonal effect for the air passenger data of §1.4.1 appeared to increase with the trend, which suggests that a ‘multiplicative’ seasonal component be used in the Holt-Winters procedure. The Holt-Winters fit is impressive – see Figure 3.12. The predict function in R can be used with the fitted model to make forecasts into the future 
+
+```{r}
+sales.quarter.hw <- HoltWinters(sales.quarter, seasonal='mult')
+plot(sales.quarter.hw)
+sales.quarter.predict <- predict(sales.quarter.hw, n.ahead=3*4) # actual: 2 * 4
+ts.plot(sales.quarter, sales.quarter.predict, lty=1:2)
+```
+
+smoothing params: alpha, beta, gamma
+
+The estimates of the model parameters, which can be obtained from AP.hw$alpha, AP.hw$beta, and AP.hw$gamma, are αˆ = 0.274, βˆ = 0.0175, and γˆ = 0.877. It should be noted that the extrapolated forecasts are based entirely on the trends in the period during which the model was fitted and would be a sensible prediction assuming these trends continue. Whilst the extrapolation in the above figure looks visually appropriate, unforeseen events could lead to completely different future values than those shown here.
+
+
+LOG:
+The generic function for making predictions in R is predict. The function essentially takes a fitted model and new data as parameters. The key to using this function with a regression model is to ensure that the new data are properly defined and labelled in a data.frame.
+In the code below, we use this function in the fitted regression model of §5.7.2 to forecast the number of air passengers travelling for the 10-year period that follows the record (Fig. 5.13). The forecast is given by applying the exponential function (anti-log) to predict because the regression model was fitted to the logarithm of the series:
+ > new.t <- time(ts(start = 1961, end = c(1970, 12), fr = 12))
+ > TIME <- (new.t - mean(time(AP)))/sd(time(AP))
+ > SIN <- COS <- matrix(nr = length(new.t), nc = 6)
+ > for (i in 1:6) {
+      COS[, i] <- cos(2 * pi * i * new.t)
+      SIN[, i] <- sin(2 * pi * i * new.t)
+  }
+ > SIN <- SIN[, -6]
+ > new.dat <- data.frame(TIME = as.vector(TIME), SIN = SIN,
+      COS = COS)
+ > AP.pred.ts <- exp(ts(predict(AP.lm2, new.dat), st = 1961,
+      fr = 12))
+ > ts.plot(log(AP), log(AP.pred.ts), lty = 1:2)
+ > ts.plot(AP, AP.pred.ts, lty = 1:2)
 
 ### AMAZ
 
