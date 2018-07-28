@@ -28,9 +28,9 @@ raw.sales <- read.csv('./data/ECOMPCTNSA.csv', header=TRUE, sep=',')
 
 ## Question 1: Forecasting using a SARIMA model
 
-Since the emergence of the internet, more and more people are shopping at online retailers than brick-and-mortar stores. E-commerce is on the rise, and we would like to see what percentage of total retail sales e-commerce is accounted for in the fourth quarter of 2017. With data from the US Census Bureau ranging from 1999 to 2016, we were able to estimate it to be 11.44% using the seasonal autoregresive integrated moving average model (or SARIMA for short). While the number does not seem substantial compare to the perceived value of e-commerce, we have to remember that retail sales include motor vehicles, gas stations, and grocery stores where e-commerce has yet to play a major role in the field. 
+Since the emergence of the internet, more and more people are shopping at online retailers than brick-and-mortar stores. E-commerce is on the rise, and we would like to see what percentage of total retail sales e-commerce is accounted for in the fourth quarter of 2017. With data from the US Census Bureau ranging from 1999 to 2016, we were able to estimate it to be 11.80% using the seasonal autoregresive integrated moving average model (or SARIMA for short). While the number does not seem substantial compare to the perceived value of e-commerce, we have to remember that retail sales include motor vehicles, gas stations, and grocery stores where e-commerce has yet to play a major role in the field. 
 
-The SARIMA model that we use for the projected forecast is $\text{ARIMA}(1,2,1)(1,2,1)_4$. 
+The SARIMA model that we use for the projected forecast is $\text{ARIMA}(0,2,1)(0,2,2)_4$. 
 
 **Exploration Data Analysis**
 
@@ -132,44 +132,29 @@ Before we can forecast what percentage of total retail sales e-commerce sales wi
 * normally distributed
 
 ```{r fig.show='hold', fig.align='center', out.width='49%'}
-# base.m
-# autocorrelations -> to test uncorrelated and view variance
 tsdisplay(base.m$residuals)
-# group of autocorrelations -> to test uncorrelated
 h <- min(2 * 4, nrow(sales.train)/5) # min(2m, T/5) 
 Box.test(base.m$residuals, type='Ljung-Box', lag=h) 
-# histogram -> to test zero mean
 hist(base.m$residuals, main='Histogram of residuals (base.m)')
 abline(v=mean(base.m$residuals), col='blue')
-# Shapiro-Wilk normality test -> to test normally distributed
 shapiro.test(base.m$residuals)
 ```
 
 ```{r fig.show='hold', fig.align='center', out.width='49%'}
-# best.manual.m
-# autocorrelations -> to test uncorrelated and view variance
 tsdisplay(best.manual.m$residuals)
-# group of autocorrelations -> to test uncorrelated
 h <- min(2 * 4, nrow(sales.train)/5) # min(2m, T/5) 
 Box.test(best.manual.m$residuals, type='Ljung-Box', lag=h) 
-# histogram -> to test zero mean
 hist(best.manual.m$residuals, main='Histogram of residuals (best.manual.m)')
 abline(v=mean(best.manual.m$residuals), col='blue')
-# Shapiro-Wilk normality test -> to test normally distributed
 shapiro.test(best.manual.m$residuals)
 ```
 
 ```{r fig.show='hold', fig.align='center', out.width='49%'}
-# best.auto.m
-# autocorrelations -> to test uncorrelated and view variance
 tsdisplay(best.auto.m$residuals)
-# group of autocorrelations -> to test uncorrelated
 h <- min(2 * 4, nrow(sales.train)/5) # min(2m, T/5) 
 Box.test(best.auto.m$residuals, type='Ljung-Box', lag=h) 
-# histogram -> to test zero mean
 hist(best.auto.m$residuals, main='Histogram of residuals (best.auto.m)')
 abline(v=mean(best.auto.m$residuals), col='blue')
-# Shapiro-Wilk normality test -> to test normally distributed
 shapiro.test(best.auto.m$residuals)
 ```
 
@@ -185,24 +170,31 @@ InvBoxCox(predict(base.m, 3*4)$pred, lambda)
 InvBoxCox(predict(best.manual.m, 3*4)$pred, lambda)
 InvBoxCox(predict(best.auto.m, 3*4)$pred, lambda)
 ```
-
-
-```{r fig.show='hold', fig.align='center', out.width='49%'}
+```{r}
+accuracy(forecast(base.m), sales.test)
+accuracy(forecast(best.manual.m), sales.test)
+accuracy(forecast(best.auto.m), sales.test)
+```
+```{r fig.show='hold', fig.align='center', out.width='32%'}
 ts.plot(cbind(sales.train, sales.test, InvBoxCox(predict(base.m, 4*3)$pred, lambda)), 
         col=c('black', 'orange', 'blue'), lty=c(1,1,2), 
         main='Forecasts to 2017 with manual ARIMA(1,2,1)(1,2,1)[4]')
-plot(forecast(base.m))
 ts.plot(cbind(sales.train, sales.test, InvBoxCox(predict(best.manual.m, 4*3)$pred, lambda)), 
         col=c('black', 'orange', 'blue'), lty=c(1,1,2), 
         main='Forecasts to 2017 with manual ARIMA(0,2,1)(0,2,2)[4]')
-plot(forecast(best.manual.m))
 ts.plot(cbind(sales.train, sales.test, InvBoxCox(predict(best.auto.m, 4*3)$pred, lambda)), 
         col=c('black', 'orange', 'blue'), lty=c(1,1,2),
         main='Forecasts to 2017 with auto ARIMA(0,1,0)(0,1,2)[4]')
+plot(forecast(base.m))
+plot(forecast(best.manual.m))
 plot(forecast(best.auto.m))
 ```
 
-Both the forecasts as well as the graphs tell us that our manually generated model $\text{ARIMA}(1,2,1)(1,2,1)_4$ predict much more closely to the test data than the automated models. We use our manually generated model to determine that e-commerce makes up approximately 11.44% of all retail sales by the fourth quarter of 2017.
+The forecasts, the RMSE, and the graphs tell us that our generated model $\text{ARIMA}(0,2,1)(0,2,2)_4$ predict much more closely to the test data than the other two. We use our generated model to determine that e-commerce makes up approximately 11.80% of all retail sales by the fourth quarter of 2017.
+
+
+
+
 
 
 ## Question 2: Learning how to use the xts library
