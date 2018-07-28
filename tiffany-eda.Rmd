@@ -262,7 +262,7 @@ In this chap- ter we first extend the random walk model to include autoregressiv
 
 non-stationary seasonal ARIMA (SARIMA) process
 
-Series may also be non-stationary because the variance is serially corre- lated (technically known as conditionally heteroskedastic), which usually re- sults in periods of volatility, where there is a clear change in variance. One approach to modelling series of this nature is to use an autoregressive model for the variance, i.e. an autoregressive conditional het- eroskedastic (ARCH) model.
+Series may also be non-stationary because the variance is serially correlated (technically known as conditionally heteroskedastic), which usually results in periods of volatility, where there is a clear change in variance. One approach to modelling series of this nature is to use an autoregressive model for the variance, i.e. an autoregressive conditional het- eroskedastic (ARCH) model.
 
 Differencing a series {xt} can remove trends, whether these trends are stochas- tic, as in a random walk, or deterministic, as in the case of a linear trend.
 Notice that the consequence of differencing a linear trend with white noise is an MA(1) process, whereas subtraction of the trend, a + bt, would give white noise. This raises an issue of whether or not it is sen- sible to use differencing to remove a deterministic trend. The arima function in R does not allow the fitted differenced models to include a constant. If you wish to fit a differenced model to a deterministic trend using R you need to difference, then mean adjust the differenced series to have a mean of 0, and then fit an ARMA model to the adjusted differenced series using arima with include.mean set to FALSE and d = 0.
@@ -285,9 +285,17 @@ The parameter d = 1 is re- tained in both the models since we found in §7.2.1 t
 # autoregressive term 
 AIC (arima(log(sales.quarter), order = c(1,1,0),
                              seas = list(order = c(1,0,0), 12)))
+# order = c(0,0,0) and order (1,0,0)
+# exponential decay in the seasonal lags of the ACF
+# singlesignificant spike at lag 4 in the PACF
+
+
 # moving average term
 AIC (arima(log(sales.quarter), order = c(0,1,1),
                              seas = list(order = c(0,0,1), 12)))
+# order = c(0,0,0) and order (0,0,1)
+# a spike at lag 4 in the ACF but no other significant spikes
+# the PACF will show exponential decay in the seasonal lags, that is, at lags 4, 8, 12
 ```
 
 A simple AR model with a seasonal period of 12 units, denoted as ARIMA(0, 0, 0)(1, 0, 0)12, is xt = αxt−12 + wt. Such a model would be appropriate for monthly data when only the value in the month of the previous year influences the current monthly value. The model is station- ary when |α−1/12| > 1.
@@ -321,8 +329,8 @@ best.fit.elec <- best.arima.elec[[2]]
 acf( resid(best.fit.elec) )
 best.arima.elec [[3]]
 
-ts.plot( cbind( window(sales.quarter,start = 2015),
-                   exp(predict(best.fit.elec,4)$pred) ), lty = 1:2)
+ts.plot( cbind( window(sales.quarter,start = 1999),
+                   exp(predict(best.fit.elec,12)$pred) ), lty = 1:2)
 
 ```
 

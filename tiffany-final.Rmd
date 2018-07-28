@@ -12,7 +12,6 @@ geometry: margin=1in
 ```{r}
 # add packages
 library(knitr)
-library(ggplot2)
 # prevent source code from running off the page
 opts_chunk$set(tidy.opts=list(width.cutoff=70), tidy=TRUE)
 # remove all objects from current workspace
@@ -25,4 +24,134 @@ set.seed(1)
 raw.sales <- read.csv('./data/ECOMPCTNSA.csv', header=TRUE, sep=',')
 ```
 
-# Introduction
+# Question 1: Forecasting using a SARIMA model
+
+Since the emergence of the internet, more and more people are shopping at online retailers than brick-and-mortar stores. E-commerce is on the rise, and we would like to see what percentage of total retail sales e-commerce is accounted for in the fourth quarter of 2017. With data from the US Census Bureau ranging from 1999 to 2016, we were able to estimate using the seasonal autoregresive integrated moving average model (or SARIMA for short) that e-commerce makes up approximately 10.44% of all retail sales. While the number does not seem substantial compare to the perceived value of e-commerce, we have to remember that retail sales include motor vehicles, gas stations, and grocery stores where e-commerce has yet to play a major role in the field. 
+
+The SARIMA model that we have used for the projected forecast is $\text{ARIMA}(0,0,0)(0,0,0)_4$. 
+
+## Exploration Data Analysis 
+
+
+
+```{r fig.show='hold', fig.align='center', out.width='49%'}
+sales <- ts(raw.sales$ECOMPCTNSA, start=c(1999,4), frequency=4)
+plot(sales, ylab = "e-commerce sales (%)", main='E-commerce Quarterly Series')
+acf(sales) 
+pacf(sales)
+```
+
+```{r}
+# lag 1 autocorrelation
+acf(sales.quarter)$acf[2]
+```
+ACF shows a significant autocorrelation at lag 4 might indicate that seasonal adjustment is not adequate
+
+
+A significant value occurs at lag 1, suggesting that a more complex model may b needed 
+
+
+Not linear: 
+lag 1 autocorrelation of 0.8965 implies that a linear dependency of x_t on x_t-1 would only explain 89.65% of the variability of x_t.  The gradual decay is typical of a time series containing a trend. The peak at the 4th month indicates seasonal variation.
+
+Not random-walk:
+```{r}
+# first-order difference of a random walk are white noise series
+acf(diff(sales.quarter))
+```
+There is not a good evidence that the series follows a random walk since there are obvious patterns in the correlogram, with multiple margianlly statistically significant values.
+
+
+```{r}
+# view seasonal effect
+# remove any seasonal effects within each quarter and produce annual series of mean sales for the period 1999-2016
+plot(aggregate(sales.quarter, FUN=mean))
+ts.plot(cbind(sales.quarter, decompose(sales.quarter, type='mult')$trend), lty=1:2)
+```
+
+
+```{r}
+# summary of the values for each season
+boxplot(sales.quarter ~ cycle(sales.quarter))
+```
+
+Looking at the quarterly series graph, we can see that the data are non-stationarity with some seasonal trend. So we take the first order difference. 
+
+
+
+```{r}
+# original series
+plot(sales.quarter)
+# first-order differenced series
+plot(diff(sales.quarter)) 
+# first-order differenced log-transformed series
+plot(diff(log(sales.quarter)))
+```
+
+```{r}
+plot(diff(diff(sales.quarter)))
+plot(diff(diff(log(sales.quarter))))
+```
+
+
+The increasing trend is no longer apparent in the plots of the differenced series
+
+First-order differencing successfully removed the increasing trend in the series.
+
+```{r}
+tsdisplay(diff(log(sales.quarter), 4))
+```
+
+
+```{r}
+# remove both linear trend and additive seasonal effects in a quarterly series
+tsdisplay(diff(diff(log(sales.quarter), 4)))
+```
+
+d = 1 because first-order differencing successfully removed the trend in the series
+
+(0,0,0)(0,1,1)
+
+AR, difference, MA
+ARIMA (non-seasonal)(seasonal)
+ARIMA (0,1,0)(0,1,2)
+
+
+Our aim now is to find an appropriate ARIMA model based on the ACF and PACF.
+
+the significant spike at lag 4 in the ACF suggests a seasonal MA(1) component and no other significant spikes
+the PACF shows an exponential decay in seasonal lags, that is at lags 4, 8, 12...
+
+
+```{r}
+m1 <- Arima(sales.quarter, order=c(0,1,0), seasonal=c(0,1,1))
+tsdisplay(residuals(m1))
+AIC(m1)
+```
+
+```{r}
+m2 <- Arima(sales.quarter, order=c(0,1,0), seasonal=c(0,1,2))
+tsdisplay(residuals(m2))
+AIC(m2)
+```
+```{r}
+m3 <- Arima(sales.quarter, order=c(0,1,0), seasonal=c(0,1,3))
+tsdisplay(residuals(m3))
+AIC(m3)
+```
+
+```{r}
+m4 <- Arima(sales.quarter, order=c(0,1,0), seasonal=c(0,1,4))
+tsdisplay(residuals(m4))
+AIC(m4)
+```
+
+```{r}
+m5 <- Arima(sales.quarter, order=c(0,1,0), seasonal=c(0,1,5))
+tsdisplay(residuals(m5))
+AIC(m5)
+```
+
+# Question 2: Learning how to use the xts library
+
+If we could select one company to represent the e-commerce trend, Amazon is it. 
