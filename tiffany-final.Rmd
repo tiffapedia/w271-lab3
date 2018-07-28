@@ -26,19 +26,41 @@ raw.sales <- read.csv('./data/ECOMPCTNSA.csv', header=TRUE, sep=',')
 
 # Question 1: Forecasting using a SARIMA model
 
+TODO: change the % and ARIMA model
+
 Since the emergence of the internet, more and more people are shopping at online retailers than brick-and-mortar stores. E-commerce is on the rise, and we would like to see what percentage of total retail sales e-commerce is accounted for in the fourth quarter of 2017. With data from the US Census Bureau ranging from 1999 to 2016, we were able to estimate using the seasonal autoregresive integrated moving average model (or SARIMA for short) that e-commerce makes up approximately 10.44% of all retail sales. While the number does not seem substantial compare to the perceived value of e-commerce, we have to remember that retail sales include motor vehicles, gas stations, and grocery stores where e-commerce has yet to play a major role in the field. 
 
 The SARIMA model that we have used for the projected forecast is $\text{ARIMA}(0,0,0)(0,0,0)_4$. 
 
 ## Exploration Data Analysis 
 
+The first step once we obtained the dataset was to see if there was any missing value.
 
+```{r}
+kable(summary(raw.sales)) # output: no missing value
+sales <- ts(raw.sales$ECOMPCTNSA, start=c(1999,4), frequency=4)
+head(sales); tail(sales)
+```
+
+From the summary table, we were able to determine that there was no missing value with sales appearing to increase  overtime from 0.7% in the 4th quarter of 1999 to 9.5% in the 4th quarter of 2016. To confirm, we plot the time series as well as its associating MA(4) model. Since the series is quarterly, the MA(4) model acts as an annual trend with the seasonal effects within each quarter removed.
 
 ```{r fig.show='hold', fig.align='center', out.width='49%'}
-sales <- ts(raw.sales$ECOMPCTNSA, start=c(1999,4), frequency=4)
 plot(sales, ylab = "e-commerce sales (%)", main='E-commerce Quarterly Series')
+lines(ma(sales, order=4, centre=T), col='blue')
 acf(sales) 
 pacf(sales)
+```
+
+Clearly, the series is non-stationarity with a strong seasonality. 
+
+
+The series is a quarterly series. 
+
+
+
+```{r}
+# summary of the values for each season
+boxplot(sales.quarter ~ cycle(sales.quarter))
 ```
 
 ```{r}
