@@ -12,6 +12,7 @@ geometry: margin=1in
 ```{r}
 # add packages
 library(knitr)
+library(stats)
 # prevent source code from running off the page
 opts_chunk$set(tidy.opts=list(width.cutoff=70), tidy=TRUE)
 # remove all objects from current workspace
@@ -30,7 +31,7 @@ TODO: change the % and ARIMA model
 
 Since the emergence of the internet, more and more people are shopping at online retailers than brick-and-mortar stores. E-commerce is on the rise, and we would like to see what percentage of total retail sales e-commerce is accounted for in the fourth quarter of 2017. With data from the US Census Bureau ranging from 1999 to 2016, we were able to estimate using the seasonal autoregresive integrated moving average model (or SARIMA for short) that e-commerce makes up approximately 10.44% of all retail sales. While the number does not seem substantial compare to the perceived value of e-commerce, we have to remember that retail sales include motor vehicles, gas stations, and grocery stores where e-commerce has yet to play a major role in the field. 
 
-The SARIMA model that we use for the projected forecast is $\text{ARIMA}(0,0,0)(0,0,0)_4$. 
+The SARIMA model that we use for the projected forecast is $\text{ARIMA}(0,2,1)(2,2,1)_4$. 
 
 ## Exploration Data Analysis 
 
@@ -61,7 +62,7 @@ kpss.test(sales)
 nsdiffs(sales)
 ```
 
-Small p-value in the Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test confirms our intuition to difference the time series. Although the seasonal unit test suggests to difference the data once, we decided to difference it a second time in order to make it stationary.
+Small p-value in the Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test confirms our intuition to difference the time series. Although the seasonal unit test suggests to difference the data once, we decided to difference it a second time in order to make the series stationary.
 
 ```{r fig.show='hold', fig.align='center', out.width='49%'}
 # first-order differenced series plot
@@ -80,43 +81,166 @@ kpss.test(diff(log(sales), lag=4, difference=2))
 
 ## Modeling 
 
-Looking at the autocorrelation function (ACF) and partial autocorrelation function (PACF) of the second order differenced, we found the best-fitting model to be $\text{ARIMA}(1,2,2)(1,2,1)$. We noticed that there are spikes in the PACF at lag 4 
+Looking at the autocorrelation function (ACF) and partial autocorrelation function (PACF) of the second order differenced, we estimate the best-fitting model to be $\text{ARIMA}(1,2,2)(1,2,1)$. 
 
-(0,2,1)(2,2,1)
+Note that the first lag value of the PACF is statistically significant, where as the partial autocorrelations for all other lags are not statistically significant. This suggests a possible AR(1) model. 
+
+ARIMA(0,2,1)(2,2,1)
+
 * Second order differenced log-transformed series: $\text{ARIMA}(1,2,2)(1,2,1)$
   * non-seasonal lags
-    * 1 significant spike in PACF at lag 1 -> non-seasonal AR(1)
-    * 2 significant spikes in ACF at lag 1,3 -> non-seasonal MA(2)
+    * 1 significant spike in PACF at lag 1 -> non-seasonal AR(1) -> 0
+    * 2 significant spikes in ACF at lag 1,3 -> non-seasonal MA(2) -> 1
   * seasonal lags
-    * 1 significant spike in PACF at lag 4 -> seasonal AR(1)
+    * 1 significant spike in PACF at lag 4 -> seasonal AR(1) -> 2
     * 1 significant spike in ACF at lag 4 -> seasonal MA(1)
+
+```{r}
+(base.m <- Arima(log(sales), order=c(1,2,3),seasonal=list(order=c(1,2,1),4)))
+```
 
 By iterating through multiple parameters, we can confirm that this model is the best-fitting model under the AIC criterion.
 
-
 ```{r}
-AIC(Arima(log(sales), order=c(1,2,3),seasonal=list(order=c(1,2,1),4)))
+auto.arima(log(sales), ic='aicc', stepwise=FALSE, approximation=FALSE)
 ```
 
 
 ```{r}
-base.m <- Arima(log(sales), order=c(1,2,3),seasonal=list(order=c(1,2,1),4))
 best.m <- base.m
-for(P in 0:2) {
-  for(Q in 0:2) {
-    for(p in 0:2) {
-      for(q in 0:2) {
-        m <- Arima(log(sales), order=c(P,2,Q), seasonal=list(order=c(p,2,q)))
-        if(m$aic < best.m$aic) {
-          best.m <- m
-        }
-      }
-    }
-  }
+for(P in 0:2) for(Q in 0:2) for(p in 0:2) for(q in 0:2) {
+  m <- Arima(log(sales), order=c(P,2,Q), seasonal=list(order=c(p,2,q)))
+  if(m$aic < best.m$aic) best.m <- m
 }
 best.m
 ```
 
+A good forecasting method will yield residuals with the following properties:
+
+The residuals are uncorrelated. If there are correlations between residuals, then there is information left in the residuals which should be used in computing forecasts.
+The residuals have zero mean. If the residuals have a mean other than zero, then the forecasts are biased.
+
+Adjusting for bias is easy: if the residuals have mean mm, then simply add mm to all forecasts and the bias problem is solved. Fixing the correlation problem is harder and we will not address it until Chapter 8.
+
+In addition to these essential properties, it is useful (but not necessary) for the residuals to also have the following two properties.
+
+The residuals have constant variance.
+The residuals are normally distributed.
+```{r fig.show='hold', fig.align='center', out.width='49%'}
+# verify normality of the residuals
+tsdisplay(best.m$residuals)
+hist(best.m$residuals, main='Histogram of residuals')
+acf(best.m$residuals, main='ACF of residuals')
+Box.test(best.m$residuals, type='Ljung-Box') 
+
+# shapiro.test(best.m$residuals)
+# qqnorm(best.m$residuals); qqline(best.m$residuals)
+```
+The mean of the residuals is very close to zero and there is a significant correlation in the residuals series. The time plot of the residuals shows that the variation of the residuals stays much the same across the historical data, so the residual variance can be treated as constant. However, the histogram suggests that the residuals may not follow a normal distribution --- the left tail looks a little too long. Consequently, forecasts from this method will probably be quite good but prediction intervals computed assuming a normal distribution may be inaccurate.
+
+Looking at the residuals of our chosen model, all spoikes are within the significant limits, so our residuals appear to be white noise. Furthermore, the Ljung-Box test shows that residuals are independent (null hypothesis = independence). The Shapiro-Wilk normality test, histogram and QQ-plot also show that the residuals follow a normal distribution. 
+
+## Forecasting
+
+Use both in-sample and out-of-sample model performance. 
+
+When training your model, exclude the series from 2015 and 2016. For the out-of-sample forecast, measure your model’s performance in forecasting the quarterly E-Commerce retail sales in 2015 and 2016. Discuss the model performance. Also forecast beyond the observed time-period of the series. Specifically, generate quarterly forecast for 2017.
+```{r}
+sales.train <- ts(sales[time(sales) < 2015], start=c(1999,4), frequency=4) # 1999-2014
+sales.test <- ts(sales[time(sales) >= 2015], start=c(2015,1), frequency=4) # 2015-2016
+# train the best model excluding series from 2015-2016
+best.m.train <- Arima(log(sales.train), order=c(0,1,0), seasonal=list(order=c(0,1,2))) 
+ts.plot(cbind(window(sales, start=1999, end=2015), exp(predict(best.m.train, 4*3)$pred)), xaxt='n', lty=1:2, axes=FALSE)
+axis(1, at=seq(from=1999, to=2017), las=2, axes=FALSE)
+```
+
+
+
 # Question 2: Learning how to use the xts library
 
-If we could select one company to represent the e-commerce trend, Amazon is it. 
+If we could select one company to represent the e-commerce trend, Amazon is likely to be the first company that comes to mind.
+
+
+1. Read AMAZ.csv and UMCSENT.csv into R as R DataFrames.
+
+```{r}
+amaz <- read.csv("./data/AMAZ.csv")
+sent <- read.csv("./data/UMCSENT.csv")
+```
+
+```{r}
+amaz
+sent
+```
+
+
+2. Convert them to xts objects.
+
+```{r}
+ats <- xts(a[,-1], order.by=as.POSIXct(a[,1]))
+uts <- xts(u[,-1], order.by=as.POSIXct(u[,1]))
+```
+
+3. Merge the two set of series together, preserving all of the observations in both set of series.
+    a. Fill all of the missing values of the UMCSENT series with -9999.
+
+```{r}
+UMCSENT <- merge(ats, uts, join = "outer", fill = -9999)
+#head(UMCSENT)
+#tail(UMCSENT)
+#describe(UMCSENT)
+```
+
+    b. Then create a new series, named UMCSENT02, from the original UMCSENT series and replace all of the -9999 with NAs.
+
+```{r}
+UMCSENT02 <- UMCSENT
+UMCSENT02[UMCSENT02 == -9999] <- NA
+head(UMCSENT02)
+```
+
+    c. Then create a new series, named UMCSENT03, and replace the NAs with the last observation.
+
+```{r}
+UMCSENT03 <- UMCSENT02
+UMCSENT03 <- na.locf(UMCSENT03, na.rm = TRUE, fromLast = TRUE) 
+#head(UMCSENT03)
+#describe(UMCSENT03)
+UMCSENT03['2007-01-03']
+UMCSENT02['2007-01-03']
+```
+
+    d. Then create a new series, named UMCSENT04, and replace the NAs using linear interpolation.
+
+```{r}
+UMCSENT04 <- UMCSENT02
+UMCSENT04 <-na.approx(UMCSENT04, maxgap=31)
+head(UMCSENT04)
+
+#Check if values for uts were replaced
+UMCSENT04['2007-01-03']
+UMCSENT02['2007-01-03']
+
+```
+
+    e. Print out some observations to ensure that your merge as well as the missing value imputation are done correctly. I leave it up to you to decide exactly how many observations to print; do something that makes sense. (Hint: Do not print out the entire dataset!)
+
+```{r}
+TODO!!!!!!! 
+```
+
+4. Calculate the daily return of the Amazon closing price (AMAZ.close), where daily return is defined as $(x(t)-x(t-1))/x(t-1)$. Plot the daily return series.
+
+```{r fig.show='hold', fig.align='center', out.width='49%'}
+daily_return <- (ats[,4] - lag(ats[,4], k = 1))/ (lag(ats[,4], k = 1))
+
+plot(daily_return)
+
+```
+
+5. Create a 20-day and a 50-day rolling mean series from the AMAZ.close series.
+
+```{r}
+head(cbind(ats[,4], rollapply(ats[, 4], 20, FUN = mean, na.rm = TRUE)),30)
+head(cbind(ats[,4], rollapply(ats[, 4], 50, FUN = mean, na.rm = TRUE)),60)
+```
