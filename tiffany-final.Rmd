@@ -30,38 +30,79 @@ TODO: change the % and ARIMA model
 
 Since the emergence of the internet, more and more people are shopping at online retailers than brick-and-mortar stores. E-commerce is on the rise, and we would like to see what percentage of total retail sales e-commerce is accounted for in the fourth quarter of 2017. With data from the US Census Bureau ranging from 1999 to 2016, we were able to estimate using the seasonal autoregresive integrated moving average model (or SARIMA for short) that e-commerce makes up approximately 10.44% of all retail sales. While the number does not seem substantial compare to the perceived value of e-commerce, we have to remember that retail sales include motor vehicles, gas stations, and grocery stores where e-commerce has yet to play a major role in the field. 
 
-The SARIMA model that we have used for the projected forecast is $\text{ARIMA}(0,0,0)(0,0,0)_4$. 
+The SARIMA model that we use for the projected forecast is $\text{ARIMA}(0,0,0)(0,0,0)_4$. 
 
 ## Exploration Data Analysis 
 
-The first step once we obtained the dataset was to see if there was any missing value.
+The first step once we obtained the dataset was to examine its structure. 
 
 ```{r}
-kable(summary(raw.sales)) # output: no missing value
+dim(raw.sales)
+kable(summary(raw.sales)) 
 sales <- ts(raw.sales$ECOMPCTNSA, start=c(1999,4), frequency=4)
 head(sales); tail(sales)
 ```
 
-From the summary table, we were able to determine that there was no missing value with sales appearing to increase  overtime from 0.7% in the 4th quarter of 1999 to 9.5% in the 4th quarter of 2016. To confirm, we plot the time series as well as its associating MA(4) model. Since the series is quarterly, the MA(4) model acts as an annual trend with the seasonal effects within each quarter removed.
+We were able to determine that there was no missing value among the 69 observations with sales appearing to increase  overtime from 0.7% in the 4th quarter of 1999 to 9.5% in the 4th quarter of 2016. To confirm, we plot the time series as well as its associating MA(4) model. If the data expressed seasonality every quarter, the MA(4) model smooths out the variances and acts as an annual trend with the seasonal effects within each quarter removed.
 
 ```{r fig.show='hold', fig.align='center', out.width='49%'}
-plot(sales, ylab = "e-commerce sales (%)", main='E-commerce Quarterly Series')
+plot(sales, ylab = 'e-commerce sales (%)', main='E-commerce Quarterly Series')
 lines(ma(sales, order=4, centre=T), col='blue')
-acf(sales) 
-pacf(sales)
+acf(sales)
 ```
 
-Clearly, the series is non-stationarity with a strong seasonality. 
-
-
-The series is a quarterly series. 
-
-
+Given the upward trend and increasing variance, the series is non-stationarity with quarterly seasonality. The autocorrelation function further substantiates the series's non-stationarity because of its slow decay and multiple statistically significant values that are large and positive. For this reason, we will perform two operations. One, we will difference the series to stabilize the mean. And two, we will apply logarithmic transformation to stabilize the variance. We verified whether or not differencing is necessary using the unit root test.
 
 ```{r}
-# summary of the values for each season
-boxplot(sales.quarter ~ cycle(sales.quarter))
+# unit root test
+# H0: stationary, HA: p < 0.05, non-stationary
+kpss.test(sales)
+# number of differences required
+nsdiffs(sales)
 ```
+
+Basdfa on Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test. 
+We differenced the data twice in order to obtain a stationary series.
+
+```{r fig.show='hold', fig.align='center', out.width='49%'}
+# first-order differenced series plot
+plot(diff(sales, difference=1))
+# first-order differenced log-transformed series plot
+plot(diff(log(sales), difference=1))
+# first-order differenced log-transformed series
+tsdisplay(diff(log(sales), lag=4, difference=1))
+# second-order differenced log-transformed series
+tsdisplay(diff(log(sales), lag=4, difference=2))
+```
+Another popular unit root test is the Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test. This reverses the hypotheses, so the null-hypothesis is that the data are stationary. In this case, small p-values (e.g., less than 0.05) suggest that differencing is required.
+
+nsdiffs() which uses seasonal unit root tests to determine the appropriate number of seasonal differences required.
+
+```{r}
+nsdiffs(log(sales))
+```
+
+
+
+ and not to mention its multiple statistically significant values as a result
+
+stochastic trend: ARIMA(0,1,0)(0,0,1)_4
+seasonal terms contain stochastic trend: ARIMA(0,0,0)(0,1,1)_4
+
+
+
+
+exponential decay at lag 4, 8, 12 
+exponential decay in the seasonal lags of the ACF
+a significant spike at lag 4 in PACF
+
+A significant value occurs at lag 1, suggesting that a more complex model may b needed 
+
+
+In the plots of the seasonally differenced data, there are spikes in the PACF at lags 4, but nothing at seasonal lags in the ACF. This may be suggestive of a seasonal AR(1) term.
+
+
+
 
 ```{r}
 # lag 1 autocorrelation
@@ -70,26 +111,8 @@ acf(sales.quarter)$acf[2]
 ACF shows a significant autocorrelation at lag 4 might indicate that seasonal adjustment is not adequate
 
 
-A significant value occurs at lag 1, suggesting that a more complex model may b needed 
 
 
-Not linear: 
-lag 1 autocorrelation of 0.8965 implies that a linear dependency of x_t on x_t-1 would only explain 89.65% of the variability of x_t.  The gradual decay is typical of a time series containing a trend. The peak at the 4th month indicates seasonal variation.
-
-Not random-walk:
-```{r}
-# first-order difference of a random walk are white noise series
-acf(diff(sales.quarter))
-```
-There is not a good evidence that the series follows a random walk since there are obvious patterns in the correlogram, with multiple margianlly statistically significant values.
-
-
-```{r}
-# view seasonal effect
-# remove any seasonal effects within each quarter and produce annual series of mean sales for the period 1999-2016
-plot(aggregate(sales.quarter, FUN=mean))
-ts.plot(cbind(sales.quarter, decompose(sales.quarter, type='mult')$trend), lty=1:2)
-```
 
 
 ```{r}
@@ -102,18 +125,13 @@ Looking at the quarterly series graph, we can see that the data are non-stationa
 
 
 ```{r}
-# original series
-plot(sales.quarter)
-# first-order differenced series
-plot(diff(sales.quarter)) 
-# first-order differenced log-transformed series
-plot(diff(log(sales.quarter)))
+
 ```
 
 ```{r}
-plot(diff(diff(sales.quarter)))
-plot(diff(diff(log(sales.quarter))))
+
 ```
+
 
 
 The increasing trend is no longer apparent in the plots of the differenced series
