@@ -11,6 +11,7 @@ geometry: margin=1in
 
 ```{r}
 # add packages
+library(forecast)
 library(knitr)
 library(stats)
 library(xts)
@@ -51,45 +52,57 @@ head(sales); tail(sales)
 We were able to determine that there was no missing value among the 69 observations with sales appearing to increase  overtime from 0.7% in the 4th quarter of 1999 to 9.5% in the 4th quarter of 2016. To confirm, we plot the time series as well as its associating MA(4) model. If the data expressed seasonality every quarter, the MA(4) model smooths out the variances and acts as an annual trend with the seasonal effects within each quarter removed.
 
 ```{r fig.show='hold', fig.align='center', out.width='49%'}
-plot(sales, ylab = 'e-commerce sales (%)', main='E-commerce Quarterly Series')
+# using the entire dataset
+plot(sales, ylab = 'e-commerce sales (%)', main='E-commerce Quarterly Series (entire dataset)')
 lines(ma(sales, order=4, centre=T), col='blue')
 acf(sales)
+# using the train dataset
+plot(sales.train, ylab = 'e-commerce sales (%)', main='E-commerce Quarterly Series (train dataset)')
+lines(ma(sales.train, order=4, centre=T), col='blue')
+acf(sales.train)
 ```
 
-Given the upward trend and increasing variance, the series is non-stationary with quarterly seasonality. The autocorrelation function further substantiates the series's non-stationary because of its slow decay and $r_1$s that are large and positive ($r_1$ indicates how successive values of y relate to each other). For this reason, we will perform two operations. One, we will difference the series to stabilize the mean. And two, we will apply logarithmic transformation to stabilize the variance. We verified if differencing was necessary by running the unit root test.
+Given the upward trend and increasing variance, the series is non-stationary with quarterly seasonality. The autocorrelation function further substantiates the series's non-stationary because of its slow decay and $r_1$s that are large and positive ($r_1$ indicates how successive values of y relate to each other). For this reason, we will perform two operations. One, we will difference the series to stabilize the mean. And two, we will apply a Box-Cox transformation (logarithm and power transformation) to stabilize the variance. We verified if differencing was necessary by running the unit root test. 
 
 ```{r}
 # unit root test
 # H0: non-stationary, HA: p < 0.05, stationary
-adf.test(sales, alternative='stationary')
+adf.test(sales.train, alternative='stationary')
 # H0: stationary, HA: p < 0.05, non-stationary
-kpss.test(sales)
+kpss.test(sales.train)
 # number of differences required
-nsdiffs(sales)
+nsdiffs(sales.train)
 ```
 
-Large p-value in the Augmented Dickey-Fuller (ADF) test and small p-value in the Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test confirm our intuition to difference the time series. Although the seasonal unit test suggests to difference the data once, we decided to difference it a second time in order to make the series stationary (as implied by the two unit root tests we run before: ADF and KPSS).
+Large p-value in the Augmented Dickey-Fuller (ADF) test and small p-value in the Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test confirm our intuition to difference the time series. Although the seasonal unit test suggests to difference the data once, we decided to difference it a second time in order to make the series stationary (as implied by the two unit root tests we run before: ADF and KPSS). We applied log and power transformation to the difference using the Box-Cox transformation by first finding the best lambda value that will give the optimal uniformity in the seasonal variation before administering the said transformation.
 
 ```{r fig.show='hold', fig.align='center', out.width='49%'}
+# find the best lambda for Box-Cox transformation
+lambda <- BoxCox.lambda(sales.train)
 # first-order differenced series plot
-plot(diff(sales, difference=1))
-# first-order differenced log-transformed series plot
-plot(diff(log(sales), difference=1))
-# first-order differenced log-transformed series
-tsdisplay(diff(log(sales), lag=4, difference=1))
-# second-order differenced log-transformed series
-tsdisplay(diff(log(sales), lag=4, difference=2))
+plot(diff(sales.train, difference=1))
+# first-order differenced BoxCox-transformed series plot
+plot(diff(BoxCox(sales.train, lambda), difference=1))
+# first-order differenced BoxCox-transformed series
+tsdisplay(diff(BoxCox(sales.train, lambda), lag=4, difference=1))
+# second-order differenced BoxCox-transformed series
+tsdisplay(diff(BoxCox(sales.train, lambda), lag=4, difference=2))
 # unit root test on first-order differenced log-transformed series
-adf.test(diff(log(sales), lag=4, difference=1), alternative='stationary')
-kpss.test(diff(log(sales), lag=4, difference=1))
+adf.test(diff(BoxCox(sales.train, lambda), lag=4, difference=1), alternative='stationary')
+kpss.test(diff(BoxCox(sales.train, lambda), lag=4, difference=1))
 # unit root test on first-order differenced log-transformed series
-adf.test(diff(log(sales), lag=4, difference=2), alternative='stationary')
-kpss.test(diff(log(sales), lag=4, difference=2))
+adf.test(diff(BoxCox(sales.train, lambda), lag=4, difference=2), alternative='stationary')
+kpss.test(diff(BoxCox(sales.train, lambda), lag=4, difference=2))
 ```
 
 ## Modeling 
 
 Looking at the autocorrelation function (ACF) and partial autocorrelation function (PACF) of the second order differenced, we estimate the best-fitting model to be $\text{ARIMA}(1,2,2)(1,2,1)$. 
+
+(1,2,2)(1,2,1)
+(0,2,1)(2,2,1)
+In the non-seasonal lags, the first lag value of the PACF is statistically significant, where as the PACF for all other lags are not statistically significant. This suggests a possible non-seasonal AR(1) term. 
+In the seasonal lags, the fourth lag value of the PACF is statistically significant where as the PACF for 
 
 Note that the first lag value of the PACF is statistically significant, where as the partial autocorrelations for all other lags are not statistically significant. This suggests a possible AR(1) model. 
 
