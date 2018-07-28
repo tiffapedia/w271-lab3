@@ -62,7 +62,7 @@ lines(ma(sales.train, order=4, centre=T), col='blue')
 acf(sales.train)
 ```
 
-Given the upward trend and increasing variance, the series is non-stationary with quarterly seasonality. The autocorrelation function further substantiates the series's non-stationary because of its slow decay and $r_1$s that are large and positive ($r_1$ indicates how successive values of y relate to each other). For this reason, we will perform two operations. One, we will difference the series to stabilize the mean. And two, we will apply a Box-Cox transformation (logarithm and power transformation) to stabilize the variance. We verified if differencing was necessary by running the unit root test. 
+Given the upward trend and increasing variance, the series is non-stationary with quarterly seasonality. The autocorrelation function further substantiates the series's non-stationary because of its slow decay and $r_1$s that are large and positive ($r_1$ indicates how successive values of y relate to each other). For this reason, we will perform two operations. One, we will difference the series to stabilize the mean. And two, we will apply a Box-Cox transformation (logarithm and power transformation) to stabilize the variance. We verify if differencing was necessary by running the unit root test. 
 
 ```{r}
 # unit root test
@@ -74,11 +74,11 @@ kpss.test(sales.train)
 nsdiffs(sales.train)
 ```
 
-Large p-value in the Augmented Dickey-Fuller (ADF) test and small p-value in the Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test confirm our intuition to difference the time series. Although the seasonal unit test suggests to difference the data once, we decided to difference it a second time in order to make the series stationary (as implied by the two unit root tests we run before: ADF and KPSS). We applied log and power transformation to the difference using the Box-Cox transformation by first finding the best lambda value that will give the optimal uniformity in the seasonal variation before administering the said transformation.
+Large p-value in the Augmented Dickey-Fuller (ADF) test and small p-value in the Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test confirm our intuition to difference the time series. Although the seasonal unit test suggests to difference the data once, we decide to difference it a second time in order to make the series stationary (as implied by the two unit root tests we run before: ADF and KPSS). We apply log and power transformation to the difference using the Box-Cox transformation by first finding the best lambda value that will give the optimal uniformity in the seasonal variation before administering the said transformation.
 
 ```{r fig.show='hold', fig.align='center', out.width='49%'}
 # find the best lambda for Box-Cox transformation
-lambda <- BoxCox.lambda(sales.train)
+lambda <- BoxCox.lambda(sales.train) # lambda = 0.01467236
 # first-order differenced series plot
 plot(diff(sales.train, difference=1))
 # first-order differenced BoxCox-transformed series plot
@@ -97,44 +97,37 @@ kpss.test(diff(BoxCox(sales.train, lambda), lag=4, difference=2))
 
 ## Modeling 
 
-Looking at the autocorrelation function (ACF) and partial autocorrelation function (PACF) of the second order differenced, we estimate the best-fitting model to be $\text{ARIMA}(1,2,2)(1,2,1)$. 
+Looking at the autocorrelation function (ACF) and partial autocorrelation function (PACF) of the second order differenced, we estimate the best-fitting model to be $\text{ARIMA}(1,2,1)(1,2,1)$. 
 
-(1,2,2)(1,2,1)
-(0,2,1)(2,2,1)
-In the non-seasonal lags, the first lag value of the PACF is statistically significant, where as the PACF for all other lags are not statistically significant. This suggests a possible non-seasonal AR(1) term. 
-In the seasonal lags, the fourth lag value of the PACF is statistically significant where as the PACF for 
-
-Note that the first lag value of the PACF is statistically significant, where as the partial autocorrelations for all other lags are not statistically significant. This suggests a possible AR(1) model. 
-
-ARIMA(0,2,1)(2,2,1)
-
-* Second order differenced log-transformed series: $\text{ARIMA}(1,2,2)(1,2,1)$
-  * non-seasonal lags
-    * 1 significant spike in PACF at lag 1 -> non-seasonal AR(1) -> 0
-    * 2 significant spikes in ACF at lag 1,3 -> non-seasonal MA(2) -> 1
-  * seasonal lags
-    * 1 significant spike in PACF at lag 4 -> seasonal AR(1) -> 2
-    * 1 significant spike in ACF at lag 4 -> seasonal MA(1)
+* In the non-seasonal lags, the significant spike at lag 1 in the PACF suggests a possible non-seasonal AR(1) term. 
+* In the seasonal lags, the significant spike at lag 4 in the PACF suggests a possible seasonal AR(1) term.
+* In the non-seasonal lags, the significant spike at lag 1 in the ACF suggests a possible non-seasonal MA(1) term.
+* In the seasonal lags, the significant spike at lag 4 in the ACF suggests a possible seasonal MA(1) term.
 
 ```{r}
-(base.m <- Arima(log(sales), order=c(1,2,3),seasonal=list(order=c(1,2,1),4)))
+(base.m <- Arima(BoxCox(sales.train, lambda), order=c(1,2,1),seasonal=list(order=c(1,2,1),4)))
 ```
 
-By iterating through multiple parameters, we can confirm that this model is the best-fitting model under the AIC criterion.
+By iterating through multiple parameters, we can confirm that this model is the best-fitting model under the AICc criterion.
 
 ```{r}
-auto.arima(log(sales), ic='aicc', stepwise=FALSE, approximation=FALSE)
-```
-
-
-```{r}
-best.m <- base.m
+best.manual.m <- base.m
 for(P in 0:2) for(Q in 0:2) for(p in 0:2) for(q in 0:2) {
-  m <- Arima(log(sales), order=c(P,2,Q), seasonal=list(order=c(p,2,q)))
-  if(m$aic < best.m$aic) best.m <- m
+  m <- Arima(BoxCox(sales.train, lambda), order=c(P,2,Q), seasonal=list(order=c(p,2,q)))
+  if(m$aicc < best.m$aicc) best.manual.m <- m
 }
-best.m
+best.manual.m
 ```
+
+We compare our generated best-fitting model to the one generated by the auto.arima function and found it to be a first-order differenced series: $\text{ARIMA}(0,1,0)(0,1,2)$.
+
+```{r}
+(best.auto.m <- auto.arima(BoxCox(sales.train, lambda), ic='aicc', stepwise=FALSE, approximation=FALSE))
+```
+
+## Validating 
+
+uncorrelated (meaning there is no information left in the residuals that can be used in computing forecasts), zero mean, constant variance, normaly distributed 
 
 A good forecasting method will yield residuals with the following properties:
 
