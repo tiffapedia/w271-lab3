@@ -29,11 +29,9 @@ raw.sales <- read.csv('./data/ECOMPCTNSA.csv', header=TRUE, sep=',')
 
 # Question 1: Forecasting using a SARIMA model
 
-TODO: change the % and ARIMA model
+Since the emergence of the internet, more and more people are shopping at online retailers than brick-and-mortar stores. E-commerce is on the rise, and we would like to see what percentage of total retail sales e-commerce is accounted for in the fourth quarter of 2017. With data from the US Census Bureau ranging from 1999 to 2016, we were able to estimate using the seasonal autoregresive integrated moving average model (or SARIMA for short) that e-commerce makes up approximately 11.44% of all retail sales by the fourth quarter of 2017. While the number does not seem substantial compare to the perceived value of e-commerce, we have to remember that retail sales include motor vehicles, gas stations, and grocery stores where e-commerce has yet to play a major role in the field. 
 
-Since the emergence of the internet, more and more people are shopping at online retailers than brick-and-mortar stores. E-commerce is on the rise, and we would like to see what percentage of total retail sales e-commerce is accounted for in the fourth quarter of 2017. With data from the US Census Bureau ranging from 1999 to 2016, we were able to estimate using the seasonal autoregresive integrated moving average model (or SARIMA for short) that e-commerce makes up approximately 10.44% of all retail sales. While the number does not seem substantial compare to the perceived value of e-commerce, we have to remember that retail sales include motor vehicles, gas stations, and grocery stores where e-commerce has yet to play a major role in the field. 
-
-The SARIMA model that we use for the projected forecast is $\text{ARIMA}(0,2,1)(2,2,1)_4$. 
+The SARIMA model that we use for the projected forecast is $\text{ARIMA}(1,2,1)(1,2,1)_4$. 
 
 ## Exploration Data Analysis 
 
@@ -42,6 +40,7 @@ The first step once we obtained the dataset was to examine its structure.
 ```{r}
 # convert raw data into a time-series object
 sales <- ts(raw.sales$ECOMPCTNSA, start=c(1999,4), frequency=4)
+# hold out test data to be used as a verification process in the forecasting section
 sales.train <- ts(sales[time(sales) < 2015], start=c(1999,4), frequency=4) # 1999-2014
 sales.test <- ts(sales[time(sales) >= 2015], start=c(2015,1), frequency=4) # 2015-2016
 # examine the structure
@@ -168,16 +167,27 @@ Looking at the ACF plots, all spikes of the automated model (best.auto.m) are wi
 
 ## Forecasting
 
-Use both in-sample and out-of-sample model performance. 
+Now that we have validated our two models, it is time to extrapolate what percentage of e-sales commerce constitutes the total retail sales. First, we compare the forecasts of the two models to the hold out test data from 2015 till 2016 to see if their predictions are comparable to the actual. Then we plot out the forecasts. The blue represents the forecast and the orange represents the test data.
 
-When training your model, exclude the series from 2015 and 2016. For the out-of-sample forecast, measure your model’s performance in forecasting the quarterly E-Commerce retail sales in 2015 and 2016. Discuss the model performance. Also forecast beyond the observed time-period of the series. Specifically, generate quarterly forecast for 2017.
 ```{r}
-# train the best model excluding series from 2015-2016
-best.m.train <- Arima(log(sales.train), order=c(0,1,0), seasonal=list(order=c(0,1,2))) 
-ts.plot(cbind(window(sales, start=1999, end=2015), exp(predict(best.m.train, 4*3)$pred)), xaxt='n', lty=1:2, axes=FALSE)
-axis(1, at=seq(from=1999, to=2017), las=2, axes=FALSE)
+sales.test
+InvBoxCox(predict(best.manual.m, 3*4)$pred, lambda)
+InvBoxCox(predict(best.auto.m, 3*4)$pred, lambda)
 ```
 
+
+```{r fig.show='hold', fig.align='center', out.width='49%'}
+ts.plot(cbind(sales.train, sales.test, InvBoxCox(predict(best.manual.m, 4*3)$pred, lambda)), 
+        col=c('black', 'orange', 'blue'), lty=c(1,1,2), 
+        main='Forecasts to 2017 with manual ARIMA(1,2,1)(1,2,1)[4]')
+ts.plot(cbind(sales.train, sales.test, InvBoxCox(predict(best.auto.m, 4*3)$pred, lambda)), 
+        col=c('black', 'orange', 'blue'), lty=c(1,1,2),
+        main='Forecasts to 2017 with auto ARIMA(0,1,0)(0,1,2)[4]')
+plot(forecast(best.manual.m))
+plot(forecast(best.auto.m))
+```
+
+Both the forecasts as well as the graphs tell us that our manually generated model $\text{ARIMA}(1,2,1)(1,2,1)_4$ predict much more closely to the test data than the automated model found by the auto.arima function $\text{ARIMA}(0,1,0)(0,1,2)_4$. We use our manually generated model to determine that e-commerce makes up approximately 11.44% of all retail sales by the fourth quarter of 2017.
 
 
 # Question 2: Learning how to use the xts library
@@ -190,7 +200,6 @@ If we could select one company to represent the e-commerce trend, Amazon is like
 ```{r}
 raw.amaz <- read.csv('./data/AMAZ.csv', header=TRUE, sep=',')
 raw.sent <- read.csv('./data/UMCSENT.csv', header=TRUE, sep=',')
-amaz <- ts()
 ```
 
 ```{r}
