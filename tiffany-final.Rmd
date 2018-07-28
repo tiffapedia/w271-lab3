@@ -13,6 +13,7 @@ geometry: margin=1in
 # add packages
 library(knitr)
 library(stats)
+library(xts)
 # prevent source code from running off the page
 opts_chunk$set(tidy.opts=list(width.cutoff=70), tidy=TRUE)
 # remove all objects from current workspace
@@ -38,9 +39,12 @@ The SARIMA model that we use for the projected forecast is $\text{ARIMA}(0,2,1)(
 The first step once we obtained the dataset was to examine its structure. 
 
 ```{r}
-dim(raw.sales)
-kable(summary(raw.sales)) 
+# convert raw data into a time-series object
 sales <- ts(raw.sales$ECOMPCTNSA, start=c(1999,4), frequency=4)
+sales.train <- ts(sales[time(sales) < 2015], start=c(1999,4), frequency=4) # 1999-2014
+sales.test <- ts(sales[time(sales) >= 2015], start=c(2015,1), frequency=4) # 2015-2016
+# examine the structure
+kable(summary(raw.sales)) 
 head(sales); tail(sales)
 ```
 
@@ -52,17 +56,19 @@ lines(ma(sales, order=4, centre=T), col='blue')
 acf(sales)
 ```
 
-Given the upward trend and increasing variance, the series is non-stationary with quarterly seasonality. The autocorrelation function further substantiates the series's non-stationary because of its slow decay and multiple statistically significant values that are large and positive. For this reason, we will perform two operations. One, we will difference the series to stabilize the mean. And two, we will apply logarithmic transformation to stabilize the variance. We verified whether or not differencing is necessary using the unit root test.
+Given the upward trend and increasing variance, the series is non-stationary with quarterly seasonality. The autocorrelation function further substantiates the series's non-stationary because of its slow decay and $r_1$s that are large and positive ($r_1$ indicates how successive values of y relate to each other). For this reason, we will perform two operations. One, we will difference the series to stabilize the mean. And two, we will apply logarithmic transformation to stabilize the variance. We verified if differencing was necessary by running the unit root test.
 
 ```{r}
 # unit root test
+# H0: non-stationary, HA: p < 0.05, stationary
+adf.test(sales, alternative='stationary')
 # H0: stationary, HA: p < 0.05, non-stationary
 kpss.test(sales)
 # number of differences required
 nsdiffs(sales)
 ```
 
-Small p-value in the Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test confirms our intuition to difference the time series. Although the seasonal unit test suggests to difference the data once, we decided to difference it a second time in order to make the series stationary.
+Large p-value in the Augmented Dickey-Fuller (ADF) test and small p-value in the Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test confirm our intuition to difference the time series. Although the seasonal unit test suggests to difference the data once, we decided to difference it a second time in order to make the series stationary (as implied by the two unit root tests we run before: ADF and KPSS).
 
 ```{r fig.show='hold', fig.align='center', out.width='49%'}
 # first-order differenced series plot
@@ -74,8 +80,10 @@ tsdisplay(diff(log(sales), lag=4, difference=1))
 # second-order differenced log-transformed series
 tsdisplay(diff(log(sales), lag=4, difference=2))
 # unit root test on first-order differenced log-transformed series
+adf.test(diff(log(sales), lag=4, difference=1), alternative='stationary')
 kpss.test(diff(log(sales), lag=4, difference=1))
 # unit root test on first-order differenced log-transformed series
+adf.test(diff(log(sales), lag=4, difference=2), alternative='stationary')
 kpss.test(diff(log(sales), lag=4, difference=2))
 ```
 
@@ -146,8 +154,6 @@ Use both in-sample and out-of-sample model performance.
 
 When training your model, exclude the series from 2015 and 2016. For the out-of-sample forecast, measure your model’s performance in forecasting the quarterly E-Commerce retail sales in 2015 and 2016. Discuss the model performance. Also forecast beyond the observed time-period of the series. Specifically, generate quarterly forecast for 2017.
 ```{r}
-sales.train <- ts(sales[time(sales) < 2015], start=c(1999,4), frequency=4) # 1999-2014
-sales.test <- ts(sales[time(sales) >= 2015], start=c(2015,1), frequency=4) # 2015-2016
 # train the best model excluding series from 2015-2016
 best.m.train <- Arima(log(sales.train), order=c(0,1,0), seasonal=list(order=c(0,1,2))) 
 ts.plot(cbind(window(sales, start=1999, end=2015), exp(predict(best.m.train, 4*3)$pred)), xaxt='n', lty=1:2, axes=FALSE)
@@ -164,21 +170,24 @@ If we could select one company to represent the e-commerce trend, Amazon is like
 1. Read AMAZ.csv and UMCSENT.csv into R as R DataFrames.
 
 ```{r}
-amaz <- read.csv("./data/AMAZ.csv")
-sent <- read.csv("./data/UMCSENT.csv")
+raw.amaz <- read.csv('./data/AMAZ.csv', header=TRUE, sep=',')
+raw.sent <- read.csv('./data/UMCSENT.csv', header=TRUE, sep=',')
+amaz <- ts()
 ```
 
 ```{r}
-amaz
-sent
+raw.sent
 ```
-
 
 2. Convert them to xts objects.
 
 ```{r}
-ats <- xts(a[,-1], order.by=as.POSIXct(a[,1]))
-uts <- xts(u[,-1], order.by=as.POSIXct(u[,1]))
+# set local timezone
+Sys.setenv(TZ='America/Los_Angeles')
+# assume stock data is collected in EST
+amaz <- xts(raw.amaz[,-1], order.by=as.POSIXct(raw.amaz[,1], tz='EST'))
+# assume sentiment data is collected in EST
+sent <- xts(raw.sent[,-1], order.by=as.POSIXct(raw.sent[,1], tz='EST'))
 ```
 
 3. Merge the two set of series together, preserving all of the observations in both set of series.
