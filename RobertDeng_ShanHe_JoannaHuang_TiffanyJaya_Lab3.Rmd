@@ -276,6 +276,20 @@ UMCSENT02['2007-01-03']
 
 ```{r}
 #TODO!!!!!!! 
+#check Jan 3 for both raw datasets
+ats['2007-01-03']
+uts['2007-01-03']
+
+#not in uts, check two closesest uts values
+uts['2007-01-01']
+uts['2007-02-01']
+
+#check merge
+UMCSENT04['2007-01-03']
+
+#check interpolation
+coredata(UMCSENT04['2007-01-03', 6]) == coredata(uts['2007-01-01']) - (coredata(uts['2007-01-01']) - coredata(uts['2007-02-01'])) * 2/31 
+
 ```
 
 4. Calculate the daily return of the Amazon closing price (AMAZ.close), where daily return is defined as $(x(t)-x(t-1))/x(t-1)$. Plot the daily return series.
