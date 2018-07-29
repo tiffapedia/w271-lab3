@@ -1,6 +1,6 @@
 ---
 title: "W271 Lab 3"
-author: "Tiffany Jaya, Robert Deng, Joanna Huang, Shan He"
+author: "Tiffany Jaya, Joanna Huang, Robert Deng, Shan He"
 output: 
   pdf_document:
   toc: true
@@ -28,11 +28,11 @@ raw.sales <- read.csv('./data/ECOMPCTNSA.csv', header=TRUE, sep=',')
 
 ## Question 1: Forecasting using a SARIMA model
 
-Since the emergence of the internet, more and more people are shopping at online retailers than brick-and-mortar stores. E-commerce is on the rise, and we would like to see what percentage of total retail sales e-commerce is accounted for in the fourth quarter of 2017. With data from the US Census Bureau ranging from 1999 to 2016, we were able to estimate it to be 11.80% using the seasonal autoregresive integrated moving average model (or SARIMA for short). While the number does not seem substantial compare to the perceived value of e-commerce, we have to remember that retail sales include motor vehicles, gas stations, and grocery stores where e-commerce has yet to play a major role in the field. 
+Since the emergence of the internet, more and more people are shopping at online retailers than brick-and-mortar stores. E-commerce is on the rise, and we would like to see what percentage of total retail sales e-commerce is accounted for in the fourth quarter of 2017. With data from the US Census Bureau ranging from 1999 to 2016, we were able to estimate it to be 10.20% using the seasonal autoregresive integrated moving average model (or SARIMA for short). While the number does not seem substantial compare to the perceived value of e-commerce, we have to remember that retail sales include motor vehicles, gas stations, and grocery stores where e-commerce has yet to play a major role in the field. 
 
-The SARIMA model that we use for the projected forecast is $\text{ARIMA}(0,2,1)(0,2,2)_4$. 
+The SARIMA model that we use for the projected forecast is $\text{ARIMA}(0,1,0)(0,1,1)_4$. 
 
-**Exploration Data Analysis**
+### Exploration Data Analysis
 
 The first step once we obtained the dataset was to examine its structure. 
 
@@ -51,80 +51,91 @@ We were able to determine that there was no missing value among the 69 observati
 
 ```{r fig.show='hold', fig.align='center', out.width='49%'}
 # using the entire dataset
-plot(sales, ylab = 'e-commerce sales (%)', main='E-commerce Quarterly Series (entire dataset)')
+plot(sales, ylab = 'e-commerce sales (%)', main='Quarterly Series (entire dataset)')
 lines(ma(sales, order=4, centre=T), col='blue')
 acf(sales)
 # using the train dataset
-plot(sales.train, ylab = 'e-commerce sales (%)', main='E-commerce Quarterly Series (train dataset)')
+plot(sales.train, ylab = 'e-commerce sales (%)', main='Quarterly Series (train dataset)')
 lines(ma(sales.train, order=4, centre=T), col='blue')
 acf(sales.train)
+# remove trend to see seasonality
+plot(sales - ma(sales, order=4, centre=T), main='Seasonality (Proof Not Additive Model)') 
+plot(sales / ma(sales, order=4, centre=T), main='Seasonality (Proof Is Multiplicative Model)')
 ```
 
-Given the upward trend and increasing variance, the series is non-stationary with quarterly seasonality. The autocorrelation function further substantiates the series's non-stationary because of its slow decay and $r_1$s that are large and positive ($r_1$ indicates how successive values of y relate to each other). For this reason, we will perform two operations. One, we will difference the series to stabilize the mean. And two, we will apply a Box-Cox transformation (logarithm and power transformation) to stabilize the variance. We verify if differencing was necessary by running the unit root test. 
+Given the upward trend and increasing variance, the series is a multiplicative model that is non-stationary with quarterly seasonality. The autocorrelation function further substantiates the series's non-stationary because of its slow decay and $r_1$s that are large and positive ($r_1$ indicates how successive values of y relate to each other). For this reason, we will perform two operations. One, we will difference the series to stabilize the mean. And two, we will apply a Box-Cox transformation (logarithm and power transformation) to stabilize the variance. We verify if differencing was necessary by running the unit root test. 
 
 ```{r warning=FALSE}
 # unit root test
 cbind(adf.test(sales.train, alternative='stationary')$p.value, 
       kpss.test(sales.train)$p.value, 
+      ndiffs(sales.train),
       nsdiffs(sales.train))
 ```
 
-Large p-value in the Augmented Dickey-Fuller (ADF) test and small p-value in the Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test confirm our intuition to difference the time series. Although the seasonal unit test suggests to difference the data once, we decide to difference it a second time in order to make the series stationary (as implied by the two unit root tests we run before: ADF and KPSS). We apply log and power transformation to the difference using the Box-Cox transformation by first finding the best lambda value that will give the optimal uniformity in the seasonal variation before administering the said transformation.
+Large p-value in the Augmented Dickey-Fuller (ADF) test and small p-value in the Kwiatkowski-Phillips-Schmidt-Shin (KPSS) test confirm our intuition to difference the time series. As suggested by the non-seasonal (ndiffs) and seasonal (nsdiff) unit test, we will perform a non-seasonal difference to the data once and a seasonal difference once in order to make the series stationary in mean. The ADF and KPSS tests we run afterwards validate our differencing decision. We apply log and power transformation to the difference using the Box-Cox transformation by first finding the best lambda value that will give the optimal uniformity in the seasonal variation before administering the said transformation. With a lambda value of 0.01467236, the transformation is similar to a log transformation.
 
 ```{r fig.show='hold', fig.align='center', out.width='49%', warning=FALSE}
 # find the best lambda for Box-Cox transformation
-lambda <- BoxCox.lambda(sales.train) # lambda = 0.01467236
-# first-order differenced series plot
-plot(diff(sales.train, difference=1))
-# first-order differenced BoxCox-transformed series plot
-plot(diff(BoxCox(sales.train, lambda), difference=1))
-# first-order differenced BoxCox-transformed series
-tsdisplay(diff(BoxCox(sales.train, lambda), lag=4, difference=1))
-# second-order differenced BoxCox-transformed series
-tsdisplay(diff(BoxCox(sales.train, lambda), lag=4, difference=2))
+# lambda = 0.01467236, similar to a log-transformation
+lambda <- BoxCox.lambda(sales.train) 
+# first-order non-seasonal differenced 
+plot(diff(sales.train),
+     main='1st order non-seasonal difference')
+# ^ with Box-Cox transformed
+plot(diff(BoxCox(sales.train, lambda)), 
+     main='1st order non-seasonal difference w/ Box-Cox transform')
+# ^ with first-order seasonal differenced
+plot(diff(diff(BoxCox(sales.train, lambda), lag=4)), 
+     main='1st order non-seasonal and seasonal difference w/ Box-Cox transform')
+# ^ and ACF and PACF
+tsdisplay(diff(diff(BoxCox(sales.train, lambda), lag=4)))
 # unit root test on first-order differenced log-transformed series
-cbind(adf.test(diff(BoxCox(sales.train, lambda), lag=4, difference=1), alternative='stationary')$p.value, 
-      kpss.test(diff(BoxCox(sales.train, lambda), lag=4, difference=1))$p.value)
-# unit root test on first-order differenced log-transformed series
-cbind(adf.test(diff(BoxCox(sales.train, lambda), lag=4, difference=2), alternative='stationary')$p.value, 
-      kpss.test(diff(BoxCox(sales.train, lambda), lag=4, difference=2))$p.value)
+cbind(adf.test(diff(diff(BoxCox(sales.train, lambda), lag=4)), alternative='stationary')$p.value, 
+      kpss.test(diff(diff(BoxCox(sales.train, lambda), lag=4)))$p.value)
 ```
 
-**Modeling** 
+### Modeling 
 
-Looking at the autocorrelation function (ACF) and partial autocorrelation function (PACF) of the second order differenced, we estimate the best-fitting model to be $\text{ARIMA}(1,2,1)(1,2,1)_4$. 
+Looking at the autocorrelation function (ACF) and partial autocorrelation function (PACF), we estimate the best-fitting model to be $\text{ARIMA}(0,1,0)(0,1,1)_4$. Our reasoning is as follows:
 
-* In the non-seasonal lags, the significant spike at lag 1 in the PACF suggests a possible non-seasonal AR(1) term. 
-* In the seasonal lags, the significant spike at lag 4 in the PACF suggests a possible seasonal AR(1) term.
-* In the non-seasonal lags, the significant spike at lag 1 in the ACF suggests a possible non-seasonal MA(1) term.
-* In the seasonal lags, the significant spike at lag 4 in the ACF suggests a possible seasonal MA(1) term.
+* Since we perform first order non-seasonal and seasonal difference, the non-seasonal difference d and seasonal difference D are equal to 1. 
+* With no significant spike in the non-seasonal lags of ACF and PACF plots, it suggests a possible non-seasonal AR(0) and MA(0) term.
+* Since the seasonal correlograms in the ACF plot do not tail off to zero but those in the PACF plot does after lag 4, it signifies a potential moving average model. The only significant spike in ACF is at lag 4; all other autocorrelations are not significant. For this reason, it suggests a potential seasonal MA(1) term. 
 
 ```{r}
-(base.m <- Arima(BoxCox(sales.train, lambda), order=c(1,2,1),seasonal=list(order=c(1,2,1),4)))
+(base.m <- Arima(BoxCox(sales.train, lambda), order=c(0,1,0),seasonal=list(order=c(0,1,1),4)))
 ```
 
-By iterating through multiple parameters, we can find the second best-fitting model under the AICc criterion: $\text{ARIMA}(0,2,1)(0,2,2)_4$.
+By iterating through multiple parameters, we can confirm whether or not this model is the best-fitting model under the AICc criterion. We chose AICc instead of AIC since the number of observations, 69, is small and AICc can address AIC's potential problem of overfitting for small sample sizes.
 
 ```{r}
 best.manual.m <- base.m
-for(P in 0:2) for(Q in 0:2) for(p in 0:2) for(q in 0:2) {
-  m <- Arima(BoxCox(sales.train, lambda), order=c(P,2,Q), seasonal=list(order=c(p,2,q)))
+for(p in 0:2) for(q in 0:2) for(d in 1:2) for(P in 0:2) for(Q in 0:2) for(D in 1:2) {
+  m <- Arima(BoxCox(sales.train, lambda), order=c(p,d,q), seasonal=list(order=c(P,D,Q)))
   if(m$aicc < best.manual.m$aicc) best.manual.m <- m
 }
 best.manual.m
 ```
 
-We compare our generated best-fitting model to the one generated by the auto.arima function and found it to be a first-order differenced series: $\text{ARIMA}(0,1,0)(0,1,2)_4$.
+What we have found is that $\text{ARIMA}(0,1,0)(0,1,2)_4$ has a lower AICc score than our estimated model we derived earlier $\text{ARIMA}(0,1,0)(0,1,1)_4$. In other words, $\text{ARIMA}(0,1,0)(0,1,2)_4$ may better explain the data but that fit might not be worth it at the cost of a loss in parsimony since we have to impose an additional seasonal MA lag into our estimated model. Similarly, $\text{ARIMA}(0,1,0)(0,1,1)_4$ may be more parsimonious, but it might not explain the data as well as $\text{ARIMA}(0,1,0)(0,1,2)_4$.
+
+We compare our generated best-fitting model $\text{ARIMA}(0,1,0)(0,1,2)_4$ to the one generated by the auto.arima function and found it to be the same.
 
 ```{r}
 (best.auto.m <- auto.arima(BoxCox(sales.train, lambda), ic='aicc', stepwise=FALSE, approximation=FALSE))
 ```
 
-Although we know that first-order differencing does not pass the unit root test KPSS, we will use the model derived from the auto.arima function as a comparison model. The three models that we will take a look at moving forward are the one we derived manually ($\text{ARIMA}(1,2,1)(1,2,1)_4$), the one we automated manually ($\text{ARIMA}(0,2,1)(0,2,2)_4$) and the one we generated from the auto.arima function ($\text{ARIMA}(0,1,0)(0,1,2)_4$).
+For this reason, the two models we will compare moving forward are $\text{ARIMA}(0,1,0)(0,1,1)_4$, which is more parsimonous, and $\text{ARIMA}(0,1,0)(0,1,2)_4$, which has a better fit.
 
-**Validating the models**
+```{r}
+m1 <- base.m
+m2 <- best.auto.m
+```
 
-Before we can forecast what percentage of total retail sales e-commerce sales will be in the future, we first need to validate that the residuals from the three models result in the following properties:
+### Validating the models
+
+Before we can forecast what percentage of total retail sales e-commerce sales will be in the future, we first need to validate that the residuals from the two models result in the following properties:
 
 * uncorrelated, meaning there is no information left in the residuals that can be used in computing the forecast
 * zero mean
@@ -132,70 +143,43 @@ Before we can forecast what percentage of total retail sales e-commerce sales wi
 * normally distributed
 
 ```{r fig.show='hold', fig.align='center', out.width='49%'}
-tsdisplay(base.m$residuals)
+checkresiduals(m1$residuals)
 h <- min(2 * 4, nrow(sales.train)/5) # min(2m, T/5) 
-Box.test(base.m$residuals, type='Ljung-Box', lag=h) 
-hist(base.m$residuals, main='Histogram of residuals (base.m)')
-abline(v=mean(base.m$residuals), col='blue')
-shapiro.test(base.m$residuals)
+Box.test(m1$residuals, type='Ljung-Box', lag=h) 
+shapiro.test(m1$residuals)
 ```
 
 ```{r fig.show='hold', fig.align='center', out.width='49%'}
-tsdisplay(best.manual.m$residuals)
+checkresiduals(m2$residuals)
 h <- min(2 * 4, nrow(sales.train)/5) # min(2m, T/5) 
-Box.test(best.manual.m$residuals, type='Ljung-Box', lag=h) 
-hist(best.manual.m$residuals, main='Histogram of residuals (best.manual.m)')
-abline(v=mean(best.manual.m$residuals), col='blue')
-shapiro.test(best.manual.m$residuals)
+Box.test(m2$residuals, type='Ljung-Box', lag=h) 
+shapiro.test(m2$residuals)
 ```
 
-```{r fig.show='hold', fig.align='center', out.width='49%'}
-tsdisplay(best.auto.m$residuals)
-h <- min(2 * 4, nrow(sales.train)/5) # min(2m, T/5) 
-Box.test(best.auto.m$residuals, type='Ljung-Box', lag=h) 
-hist(best.auto.m$residuals, main='Histogram of residuals (best.auto.m)')
-abline(v=mean(best.auto.m$residuals), col='blue')
-shapiro.test(best.auto.m$residuals)
-```
+Looking at the ACF plots, all spikes of the two models are within the significant limits, meaning that the residuals are uncorrelated to one another. We then perform a test on a group of autocorrelations with the Box-Ljung test. With large p-values, the Box-Ljung test validates our assumption that the residuals are uncorrelated. The time plot of the residuals shows that the variation of the residuals stays approximately the same for both models, so we can treat the residual variance as constant. However, even with a mean close to zero, the histogram of all models suggests that it follows more of a negative skewed distribution than normal. The Shapiro-Wilk test confirms the non-normality of the distribution for the two models. What this signifies is that when we perform a prediction in the following section, its forecast will generally be quite good but prediction intervals computed assuming a normal distribution may be inaccurate.
 
-Looking at the ACF plots, all spikes of the automated models (best.manual.m, best.auto.m) are within the significant limits, meaning that the residuals are uncorrelated to one another. The same cannot be said about our manually generated model (base.m) with one significant spike at lag 8. We then perform a test on a group of autocorrelations with the Box-Ljung test. The Box-Ljung test validates our assumption that the residuals are uncorrelated. With large p-values, the residuals appear to be uncorrelated for all models. The time plot of the residuals shows that the variation of the residuals stays approximately the same for the three models, so we can treat the residual variance as constant. However, even with a mean close to zero, the histogram of all models suggests that it follows more of a negative skewed distribution than normal. The Shapiro-Wilk test confirms the non-normality of the distribution for the automated models (best.manual.m, best.auto.m) and barely do so for the manually generated one (base.m). What this signifies is that when we perform a prediction in the following section, its forecast will generally be quite good but prediction intervals computed assuming a normal distribution may be inaccurate.
+### Forecasting
 
-**Forecasting**
-
-Now that we have validated our models, it is time to extrapolate what percentage of e-sales commerce constitutes the total retail sales. First, we compare the forecasts of the two models to the hold out test data from 2015 till 2016 to see if their predictions are comparable to the actual. Then we plot out the forecasts. The blue represents the forecast and the orange represents the test data.
+Now that we have validated our models, it is time to extrapolate what percentage of e-sales commerce constitutes the total retail sales. First, we compare the forecasts of all the models to the hold out test data from 2015 till 2016 to see if their predictions are comparable to the actual. Then we plot out the forecasts. The blue represents the forecast and the orange represents the test data.
 
 ```{r}
 sales.test
-InvBoxCox(predict(base.m, 3*4)$pred, lambda)
-InvBoxCox(predict(best.manual.m, 3*4)$pred, lambda)
-InvBoxCox(predict(best.auto.m, 3*4)$pred, lambda)
+InvBoxCox(predict(m1, 3*4)$pred, lambda)
+InvBoxCox(predict(m2, 3*4)$pred, lambda)
 ```
-```{r}
-accuracy(forecast(base.m), sales.test)
-accuracy(forecast(best.manual.m), sales.test)
-accuracy(forecast(best.auto.m), sales.test)
-```
-```{r fig.show='hold', fig.align='center', out.width='32%'}
-ts.plot(cbind(sales.train, sales.test, InvBoxCox(predict(base.m, 4*3)$pred, lambda)), 
+
+```{r fig.show='hold', fig.align='center', out.width='49%'}
+ts.plot(cbind(sales.train, sales.test, InvBoxCox(predict(m1, 4*3)$pred, lambda)), 
         col=c('black', 'orange', 'blue'), lty=c(1,1,2), 
-        main='Forecasts to 2017 with manual ARIMA(1,2,1)(1,2,1)[4]')
-ts.plot(cbind(sales.train, sales.test, InvBoxCox(predict(best.manual.m, 4*3)$pred, lambda)), 
+        main='Forecasts to 2017 with manual ARIMA(0,1,0)(0,1,1)[4]')
+ts.plot(cbind(sales.train, sales.test, InvBoxCox(predict(m2, 4*3)$pred, lambda)), 
         col=c('black', 'orange', 'blue'), lty=c(1,1,2), 
-        main='Forecasts to 2017 with manual ARIMA(0,2,1)(0,2,2)[4]')
-ts.plot(cbind(sales.train, sales.test, InvBoxCox(predict(best.auto.m, 4*3)$pred, lambda)), 
-        col=c('black', 'orange', 'blue'), lty=c(1,1,2),
-        main='Forecasts to 2017 with auto ARIMA(0,1,0)(0,1,2)[4]')
-plot(forecast(base.m))
-plot(forecast(best.manual.m))
-plot(forecast(best.auto.m))
+        main='Forecasts to 2017 with manual ARIMA(0,1,0)(0,1,2)[4]')
+plot(forecast(m1))
+plot(forecast(m2))
 ```
 
-The forecasts, the RMSE, and the graphs tell us that our generated model $\text{ARIMA}(0,2,1)(0,2,2)_4$ predict much more closely to the test data than the other two. We use our generated model to determine that e-commerce makes up approximately 11.80% of all retail sales by the fourth quarter of 2017.
-
-
-
-
-
+Both the forecasts as well as the graphs tell us that our parsimonous model $\text{ARIMA}(0,2,1)(0,2,1)_4$ predict much more closely to the test data than the autogenerated one $\text{ARIMA}(0,2,1)(0,2,2)_4$. We use this model to determine that e-commerce makes up approximately 10.20% of all retail sales by the fourth quarter of 2017.
 
 ## Question 2: Learning how to use the xts library
 
