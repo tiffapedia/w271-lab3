@@ -183,7 +183,7 @@ Both the forecasts as well as the graphs tell us that our parsimonous model $\te
 
 ## Question 2: Learning how to use the xts library
 
-If we could select one company to represent the e-commerce trend, Amazon is likely to be the first company that comes to mind.
+If we could select one company to represent the e-commerce trend, Amazon is likely to be the first company that comes to mind. We will delve briefly into the Amazon stock as a way to better understand how to use the xts library.
 
 
 1. Read AMAZ.csv and UMCSENT.csv into R as R DataFrames.
@@ -268,17 +268,16 @@ print(UMCSENT['2007-02-01'])
 
 4. Calculate the daily return of the Amazon closing price (AMAZ.close), where daily return is defined as $(x(t)-x(t-1))/x(t-1)$. Plot the daily return series.
 
-```{r fig.show='hold', fig.align='center', out.width='49%'}
-daily_return <- (ats[,4] - lag(ats[,4], k = 1))/ (lag(ats[,4], k = 1))
-
+```{r}
+daily_return <- (amaz[,4] - lag(amaz[,4], k=1))/(lag(amaz[,4], k=1))
 plot(daily_return)
-
 ```
-Looking at Amazon's closing price between January 2017 to January 2013, we see much volatility. A few trends that may be gauged is that January to July generally sees lower daily returns and peaks of 1+ returns happens post-July (which may be related to product launch timelines). These trends hold with the exception of January-July 2009 which had unprecedented returns that may be due to the acquisition of Zappos during that time. 
+
+Looking at Amazon's closing price between January 2007 to January 2013, we see much volatility. A few trends that may be gauged is that January to July generally sees lower daily returns and peaks of 1+ returns happens post-July (which may be related to product launch timelines). These trends hold with the exception of January-July 2009 which had unprecedented returns that may be due to the acquisition of Zappos during that time. 
 
 5. Create a 20-day and a 50-day rolling mean series from the AMAZ.close series.
 
 ```{r}
-head(cbind(ats[,4], rollapply(ats[, 4], 20, FUN = mean, na.rm = TRUE)),30)
-head(cbind(ats[,4], rollapply(ats[, 4], 50, FUN = mean, na.rm = TRUE)),60)
+head(cbind(amaz[,4], rollapply(amaz[,4], 20, FUN=mean, na.rm = TRUE)),30)
+head(cbind(amaz[,4], rollapply(amaz[,4], 50, FUN=mean, na.rm = TRUE)),60)
 ```
