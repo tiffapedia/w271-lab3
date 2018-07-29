@@ -300,6 +300,7 @@ daily_return <- (ats[,4] - lag(ats[,4], k = 1))/ (lag(ats[,4], k = 1))
 plot(daily_return)
 
 ```
+Looking at Amazon's closing price between January 2017 to January 2013, we see much volatility. A few trends that may be gauged is that January to July generally sees lower daily returns and peaks of 1+ returns happens post-July (which may be related to product launch timelines). These trends hold with the exception of January-July 2009 which had unprecedented returns that may be due to the acquisition of Zappos during that time. 
 
 5. Create a 20-day and a 50-day rolling mean series from the AMAZ.close series.
 
